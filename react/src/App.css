@@ -1,0 +1,11 @@
+/* Remove all custom styles for now to isolate the issue. */
+
+/* Hide only on mobile/tablet, show on desktop (>=1024px) */
+.hidden-desktop {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .hidden-desktop {
+    display: block;
+  }
+}

@@ -1,0 +1,26 @@
+/* Sidebar slide-in/out animation for mobile sidebar */
+
+#mobile-nav-sidebar .mobile-sidebar-content {
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+#mobile-nav-sidebar.closed .mobile-sidebar-content {
+  transform: translateX(-100%);
+}
+#mobile-nav-sidebar.open .mobile-sidebar-content {
+  transform: translateX(0);
+}
+
+#mobile-nav-sidebar .mobile-sidebar-overlay {
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
+  opacity: 1;
+}
+#mobile-nav-sidebar.closed .mobile-sidebar-overlay {
+  opacity: 0;
+  pointer-events: none;
+}
+#mobile-nav-sidebar.open .mobile-sidebar-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}

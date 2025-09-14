@@ -1,0 +1,40 @@
+/* Liquid X Loader CSS */
+
+.liquid-x-loader-body {
+  background-color: #000;
+}
+
+.liquid-x-wave-group {
+  animation: liquid-x-riseFall 4s ease-in-out infinite;
+}
+
+@keyframes liquid-x-riseFall {
+  0%, 100% {
+    transform: translateY(50px);
+  }
+  50% {
+    transform: translateY(10px);
+  }
+}
+
+.liquid-x-wave-move {
+  animation: liquid-x-moveWave 6s linear infinite;
+}
+
+@keyframes liquid-x-moveWave {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-200px);
+  }
+}
+
+.liquid-x-outline {
+  font-size: 150px;
+  font-weight: 800;
+  font-family: Arial, sans-serif;
+  fill: none;
+  stroke: white;
+  stroke-width: 6;
+}

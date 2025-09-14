@@ -1,0 +1,23 @@
+
+.share-success-popup {
+  position: fixed;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.7);
+  background: #22c55e;
+  color: white;
+  padding: 12px 32px;
+  border-radius: 8px;
+  z-index: 9999;
+  font-weight: bold;
+  font-size: 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  opacity: 0;
+  pointer-events: none;
+  transition: top 0.5s cubic-bezier(.68,-0.55,.27,1.55), opacity 0.4s, transform 0.5s cubic-bezier(.68,-0.55,.27,1.55);
+}
+.share-success-popup.show {
+  top: 20px;
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
