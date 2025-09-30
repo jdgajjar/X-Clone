@@ -40,10 +40,16 @@ const app = express();
 const http = require('http');
 const server = http.createServer(app);
 const { Server } = require('socket.io');
+// Environment-based CORS configuration
+const frontendURL = process.env.NODE_ENV === 'production' 
+  ? process.env.FRONTEND_URL_PROD 
+  : process.env.FRONTEND_URL || 'http://localhost:5173';
+
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173', // React dev server
-    credentials: true
+    origin: [frontendURL, 'http://localhost:5173'], // Support both dev and prod URLs
+    credentials: true,
+    methods: ["GET", "POST"]
   }
 });
 // Make io available in controllers for real-time events
@@ -69,11 +75,18 @@ io.on('connection', (socket) => {
   });
 });
 
-// Connect to MongoDB
+// Connect to MongoDB with environment-based URI
+const mongoURI = process.env.NODE_ENV === 'production' 
+  ? process.env.MONGODB_URI_PROD 
+  : process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/x-clone";
+
 mongoose
-  .connect("mongodb://127.0.0.1:27017/x-clone")
+  .connect(mongoURI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
   .then(() => {
-    console.log("Connected to MongoDB");
+    console.log(`Connected to MongoDB (${process.env.NODE_ENV || 'development'})`);
   })
   .catch((err) => {
     console.error("MongoDB connection error:", err);
@@ -94,19 +107,25 @@ app.use(methodOverride("_method"));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+// Session configuration with environment-based settings
+const isProduction = process.env.NODE_ENV === 'production';
+const sessionSecret = process.env.SESSION_SECRET || "your-secret-key";
+const sessionStore = MongoStore.create({
+  mongoUrl: mongoURI,
+  ttl: 24 * 60 * 60, // 1 day
+});
+
 app.use(
   session({
-    secret: "your-secret-key",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: "mongodb://127.0.0.1:27017/x-clone",
-      ttl: 24 * 60 * 60, // 1 day
-    }),
+    store: sessionStore,
     cookie: {
-      secure: false,
+      secure: isProduction, // Use secure cookies in production (HTTPS only)
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 1 day
+      sameSite: isProduction ? 'none' : 'lax', // Allow cross-site cookies in production
     },
   })
 );
@@ -135,7 +154,9 @@ if (GoogleStrategy) {
       {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: "http://localhost:3000/auth/google/callback",
+        callbackURL: process.env.NODE_ENV === 'production' 
+          ? `${process.env.BACKEND_URL_PROD}/auth/google/callback`
+          : `${process.env.BACKEND_URL || 'http://localhost:3000'}/auth/google/callback`,
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
@@ -225,24 +246,32 @@ const isAuthenticated = (req, res, next) => {
 
 module.exports.isAuthenticated = isAuthenticated;
 
-// Create a transporter for sending emails
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Create a transporter for sending emails with error handling
+let transporter = null;
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter = nodemailer.createTransporter({
+    service: process.env.EMAIL_SERVICE || "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+} else {
+  console.warn('Email configuration missing - email features will be disabled');
+}
 
 app.use((req, res, next) => {
   console.log(`Request: ${req.method} ${req.url}`);
   next();
 });
 
+// CORS configuration with environment support
 app.use(
   cors({
-    origin: "http://localhost:5173", // React dev server
+    origin: [frontendURL, 'http://localhost:5173'], // Support both dev and prod URLs
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   })
 );
 
