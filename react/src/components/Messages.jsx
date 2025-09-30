@@ -336,11 +336,11 @@ const Messages = () => {
     // When a message is read, update unread counts in real time
     const readHandler = (data) => {
       // Update unread counts for all users
-      fetch('http://localhost:3000/api/messages/unread-counts', { credentials: 'include' })
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.counts) setUnreadCounts(data.counts);
-        });
+      clientServer.get('/api/messages/unread-counts')
+        .then(res => {
+          if (res.data && res.data.counts) setUnreadCounts(res.data.counts);
+        })
+        .catch(err => console.error('Error fetching unread counts:', err));
     };
     socket.on("newMessage", handler);
     socket.on("messageRead", readHandler);
