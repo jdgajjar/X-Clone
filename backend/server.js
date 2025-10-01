@@ -26,6 +26,12 @@ const uploadProfileCover = multer({ storage: profileCoverStorage });
 const userRoutes = require("./routes/user.route");
 const postRoutes = require("./routes/post.route");
 const notificationRoutes = require("./routes/notification.route");
+const methodOverride = require("method-override");
+const cors = require("cors");
+
+
+const app = express();
+
 // --- React SPA catch-all (ADD THIS) ---
 const frontendBuildPath = path.join(__dirname, "../frontend/build");
 app.use(express.static(frontendBuildPath));
@@ -33,11 +39,6 @@ app.use(express.static(frontendBuildPath));
 app.get("*", (req, res) => {
   res.sendFile(path.resolve(frontendBuildPath, "index.html"));
 });
-const methodOverride = require("method-override");
-const cors = require("cors");
-
-
-const app = express();
 
 // --- SOCKET.IO SETUP ---
 const http = require('http');
