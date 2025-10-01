@@ -93,7 +93,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride("_method"));
 
-// Session
+// Session setup
 const sessionSecret = process.env.SESSION_SECRET || "your-secret-key";
 const sessionStore = MongoStore.create({
   mongoUrl: mongoURI,
@@ -131,21 +131,87 @@ app.use(
   })
 );
 
-// API Routes
+// Authentication middleware
+const isApiRequest = (req) => req.headers.accept && req.headers.accept.includes("application/json");
+
+const isAuthenticated = (req, res, next) => {
+  if (req.path === "/explore") return next();
+  if (req.session && req.session.userId) return next();
+
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.substring(7);
+      const jwt = require("jsonwebtoken");
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || "defaultsecret");
+      req.user = { _id: decoded.userId, email: decoded.email };
+      return next();
+    } catch (error) {
+      console.error("JWT verification failed:", error);
+    }
+  }
+
+  if (isApiRequest(req)) return res.status(401).json({ error: "Not authenticated" });
+  res.redirect("/login");
+};
+module.exports.isAuthenticated = isAuthenticated;
+
+// Email transporter
+let transporter = null;
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter = nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || "gmail",
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+  });
+} else {
+  console.warn("Email configuration missing - email features disabled");
+}
+
+// Debug logger
+app.use((req, res, next) => {
+  console.log(`Request: ${req.method} ${req.url}`);
+  next();
+});
+
+// Home endpoint (JSON)
+app.get("/api/home", async (req, res) => {
+  try {
+    const userId = req.user ? req.user._id : req.session.userId;
+    const user = await User.findById(userId);
+    const posts = await Post.find()
+      .sort({ createdAt: -1 })
+      .populate("author", "username name profilePhoto IsVerified")
+      .populate({ path: "replies", populate: { path: "author", select: "username name profilePhoto IsVerified" } })
+      .lean();
+
+    posts.forEach((post) => {
+      post.isLiked = userId ? post.likes.some((l) => l.toString() === userId.toString()) : false;
+      if (post.author && typeof post.author.IsVerified === "undefined") post.author.IsVerified = false;
+    });
+
+    let randomusers = await User.find({ _id: { $ne: userId } }, "username name profilePhoto IsVerified");
+    if (!randomusers || randomusers.length === 0) randomusers = await User.find({}, "username name profilePhoto IsVerified");
+
+    res.json({ user, posts, randomusers });
+  } catch (err) {
+    console.error("Home error:", err);
+    res.status(500).json({ error: "Error loading home" });
+  }
+});
+
+// API routes
 app.use("/api/users", userRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/notifications", notificationRoutes);
 
-// React frontend build (SPA)
+// React SPA catch-all
 const frontendBuildPath = path.join(__dirname, "../frontend/build");
 app.use(express.static(frontendBuildPath));
-
 app.get("*", (req, res) => {
   res.sendFile(path.resolve(frontendBuildPath, "index.html"));
 });
 
 // Start server
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
