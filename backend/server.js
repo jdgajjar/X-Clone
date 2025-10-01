@@ -32,13 +32,6 @@ const cors = require("cors");
 
 const app = express();
 
-// --- React SPA catch-all (ADD THIS) ---
-const frontendBuildPath = path.join(__dirname, "../frontend/build");
-app.use(express.static(frontendBuildPath));
-
-app.get("*", (req, res) => {
-  res.sendFile(path.resolve(frontendBuildPath, "index.html"));
-});
 
 // --- SOCKET.IO SETUP ---
 const http = require('http');
@@ -343,6 +336,15 @@ app.get("/user/search", async (req, res) => {
     res.status(500).json([]);
   }
 });
+
+// --- React SPA catch-all (ADD THIS) ---
+const frontendBuildPath = path.join(__dirname, "../frontend/build");
+app.use(express.static(frontendBuildPath));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.resolve(frontendBuildPath, "index.html"));
+});
+
 
 // Catch-all route for 404
 app.use((req, res) => {
