@@ -337,13 +337,6 @@ app.get("/user/search", async (req, res) => {
   }
 });
 
-// --- React SPA catch-all (ADD THIS) ---
-const frontendBuildPath = path.join(__dirname, "../frontend/build");
-app.use(express.static(frontendBuildPath));
-
-app.get("*", (req, res) => {
-  res.sendFile(path.resolve(frontendBuildPath, "index.html"));
-});
 
 
 // Catch-all route for 404
