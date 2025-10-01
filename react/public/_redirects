@@ -1,0 +1,4 @@
+# Handle React Router client-side routing for Render.com static site
+# This file tells Render to serve index.html for all routes that don't match static files
+# The 200 status code means "serve index.html but keep the original URL"
+/*    /index.html   200

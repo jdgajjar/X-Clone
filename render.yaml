@@ -1,0 +1,22 @@
+# Render.com deployment configuration
+services:
+  # Backend API Service
+  - type: web
+    name: x-clone-backend
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    # Environment variables will be set in Render dashboard
+
+  # Frontend Static Site
+  - type: web
+    name: x-clone-frontend
+    env: static
+    buildCommand: cd react && npm install && npm run build
+    staticPublishPath: ./react/dist
+    # The _redirects file in public folder handles SPA routing
