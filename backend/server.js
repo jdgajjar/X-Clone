@@ -209,8 +209,20 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   process.env.FRONTEND_URL_PROD,
-  'https://your-frontend-domain.onrender.com' // Add your actual Render frontend domain
+  // Add common Render.com patterns for your services
+  'https://x-clone-frontend.onrender.com',
+  'https://x-clone-frontend-*.onrender.com', // For preview deployments
+  // Add any custom domain you might use
+  process.env.CUSTOM_DOMAIN
 ].filter(Boolean); // Remove undefined values
+
+// Add wildcard matching for Render.com subdomains
+const isRenderOrigin = (origin) => {
+  return origin && (
+    origin.includes('.onrender.com') && 
+    (origin.includes('x-clone-frontend') || origin.includes('your-app-name'))
+  );
+};
 
 app.use(
   cors({
@@ -218,10 +230,12 @@ app.use(
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
       
-      if (allowedOrigins.indexOf(origin) !== -1) {
+      // Check if origin is in allowed list or is a Render.com subdomain
+      if (allowedOrigins.indexOf(origin) !== -1 || isRenderOrigin(origin)) {
         callback(null, true);
       } else {
         console.log('Blocked by CORS:', origin);
+        console.log('Allowed origins:', allowedOrigins);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -337,7 +351,26 @@ app.get("/user/search", async (req, res) => {
   }
 });
 
+// Health check endpoint for Render.com deployment monitoring
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    message: 'X-Clone Backend is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    uptime: process.uptime()
+  });
+});
 
+// API status endpoint
+app.get('/api/status', (req, res) => {
+  res.status(200).json({
+    api: 'X-Clone API',
+    status: 'active',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 // Catch-all route for 404
 app.use((req, res) => {
@@ -347,4 +380,6 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`Health check available at: http://localhost:${PORT}/health`);
+  console.log(`API status available at: http://localhost:${PORT}/api/status`);
 });

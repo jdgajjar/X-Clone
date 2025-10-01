@@ -20,8 +20,17 @@ export default defineConfig({
         manualChunks: undefined,
       },
     },
+    // Optimize for production
+    minify: 'esbuild',
+    target: 'es2015',
+    // Handle static assets
+    assetsDir: 'assets',
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
   },
+  // Handle environment-specific base URL
+  base: './',
+  // Ensure _redirects file is copied to build
+  publicDir: 'public',
 })
