@@ -7,11 +7,7 @@ const bcrypt = require("bcryptjs");
 const path = require("path");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
-const passport = require("passport");
-let GoogleStrategy;
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  GoogleStrategy = require("passport-google-oauth20").Strategy;
-}
+// Google OAuth removed - using session-based authentication only
 const {
   cloudinary,
   poststorage,
@@ -107,139 +103,80 @@ app.use(methodOverride("_method"));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-// Session configuration with environment-based settings
+// Session configuration optimized for Render.com deployment
 const isProduction = process.env.NODE_ENV === 'production';
 const sessionSecret = process.env.SESSION_SECRET || "your-secret-key";
+
+// Create session store with better error handling
 const sessionStore = MongoStore.create({
   mongoUrl: mongoURI,
   ttl: 24 * 60 * 60, // 1 day
+  touchAfter: 24 * 3600, // Only update session once per day unless changed
+  crypto: {
+    secret: sessionSecret
+  }
+});
+
+// Handle session store errors
+sessionStore.on('error', (error) => {
+  console.error('Session store error:', error);
 });
 
 app.use(
   session({
     secret: sessionSecret,
+    name: 'sessionId',
     resave: false,
     saveUninitialized: false,
     store: sessionStore,
     cookie: {
       secure: isProduction, // Use secure cookies in production (HTTPS only)
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days for better user experience
       sameSite: isProduction ? 'none' : 'lax', // Allow cross-site cookies in production
     },
+    rolling: true // Reset expiration on activity
   })
 );
 
-// Passport configuration
-app.use(passport.initialize());
-app.use(passport.session());
+// Session-based authentication only (Google OAuth removed)
 
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
+// Google OAuth removed - using session-based authentication only
 
-passport.deserializeUser(async (id, done) => {
-  try {
-    const user = await User.findById(id);
-    done(null, user);
-  } catch (error) {
-    done(error, null);
-  }
-});
-
-// Google OAuth Strategy
-if (GoogleStrategy) {
-  passport.use(
-    new GoogleStrategy(
-      {
-        clientID: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: process.env.NODE_ENV === 'production' 
-          ? `${process.env.BACKEND_URL_PROD}/auth/google/callback`
-          : `${process.env.BACKEND_URL || 'http://localhost:3000'}/auth/google/callback`,
-      },
-      async (accessToken, refreshToken, profile, done) => {
-        try {
-          // Check if user already exists
-          let user = await User.findOne({ email: profile.emails[0].value });
-
-          if (!user) {
-            // Create new user if doesn't exist
-            user = new User({
-              username: profile.displayName.toLowerCase().replace(/\s+/g, ""),
-              email: profile.emails[0].value,
-              password: crypto.randomBytes(32).toString("hex"), // Generate random password
-              profilePhoto: {
-                url: "https://res.cloudinary.com/dkqd9ects/image/upload/v1747571510/profile_offakc.png",
-                filename: "profile_images",
-              },
-              coverPhoto: {
-                url: "https://res.cloudinary.com/dkqd9ects/image/upload/v1747571508/cover_image_hnvoqn.webp",
-                filename: "profile_covers",
-              },
-            });
-            await user.save();
-
-            // Find a random user to follow (excluding the new user)
-            const randomUser = await User.aggregate([
-              { $match: { _id: { $ne: user._id } } },
-              { $sample: { size: 1 } },
-            ]);
-
-            if (randomUser && randomUser.length > 0) {
-              // Add random user to following list
-              user.following.push(randomUser[0]._id);
-              // Add new user to random user's followers list
-              await User.findByIdAndUpdate(randomUser[0]._id, {
-                $push: { followers: user._id },
-              });
-
-              // Save the new user with updated following list
-              await user.save();
-            }
-          }
-
-          return done(null, user);
-        } catch (error) {
-          return done(error, null);
-        }
-      }
-    )
-  );
-}
-
-// Google Auth Routes (only if GoogleStrategy is enabled)
-if (GoogleStrategy) {
-  app.get(
-    "/auth/google",
-    passport.authenticate("google", { scope: ["profile", "email"] })
-  );
-
-  app.get(
-    "/auth/google/callback",
-    passport.authenticate("google", { failureRedirect: "/login" }),
-    (req, res) => {
-      res.redirect("/");
-    }
-  );
-}
+// Google OAuth routes removed - using email/password authentication only
 
 
 // Authentication middleware (exported for use in routes)
 const isApiRequest = (req) => req.headers.accept && req.headers.accept.includes('application/json');
 
 const isAuthenticated = (req, res, next) => {
+  // Allow access to explore page without authentication
   if (req.path === "/explore") {
-    return next(); // Allow access to the explore page without authentication
-  }
-  if (req.isAuthenticated && req.isAuthenticated()) {
     return next();
   }
+  
+  // Check for session-based authentication
   if (req.session && req.session.userId) {
     return next();
   }
+  
+  // Check for JWT token in Authorization header
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.substring(7);
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret');
+      req.user = { _id: decoded.userId, email: decoded.email };
+      return next();
+    } catch (error) {
+      console.error('JWT verification failed:', error);
+    }
+  }
+  
+  // Not authenticated - handle based on request type
   if (isApiRequest(req)) {
-    return res.status(401).json({ error: "Not authenticated" });
+    return res.status(401).json({ error: "Not authenticated. Please login first." });
   }
   res.redirect("/login");
 };
@@ -249,7 +186,7 @@ module.exports.isAuthenticated = isAuthenticated;
 // Create a transporter for sending emails with error handling
 let transporter = null;
 if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-  transporter = nodemailer.createTransporter({
+  transporter = nodemailer.createTransport({
     service: process.env.EMAIL_SERVICE || "gmail",
     auth: {
       user: process.env.EMAIL_USER,
@@ -265,13 +202,33 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS configuration with environment support
+// Enhanced CORS configuration for Render.com deployment
+const allowedOrigins = [
+  frontendURL,
+  'http://localhost:5173',
+  'http://localhost:3000',
+  process.env.FRONTEND_URL_PROD,
+  'https://your-frontend-domain.onrender.com' // Add your actual Render frontend domain
+].filter(Boolean); // Remove undefined values
+
 app.use(
   cors({
-    origin: [frontendURL, 'http://localhost:5173'], // Support both dev and prod URLs
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        console.log('Blocked by CORS:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+    exposedHeaders: ['Set-Cookie'],
+    optionsSuccessStatus: 200
   })
 );
 
