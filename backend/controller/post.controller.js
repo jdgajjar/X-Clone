@@ -70,8 +70,8 @@ const bcrypt = require("bcryptjs");
 const path = require("path");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
-const passport = require("passport");
-const GoogleStrategy = require("passport-google-oauth20").Strategy;
+// Passport removed - using session-based authentication only
+// Google OAuth removed - using session-based authentication only
 const {
   cloudinary,
   poststorage,
