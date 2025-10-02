@@ -1,3 +1,6 @@
+// Import Post model
+const Post = require("../models/Post.js");
+
 // Utility: Remove all replies with author missing or username 'Unknown' from all posts, and do it on every getComments call
 async function deleteUnknownCommentsFromAllPosts() {
   const posts = await Post.find({ 'replies': { $exists: true, $ne: [] } }).populate('replies.author');
@@ -98,8 +101,7 @@ const methodOverride = require("method-override");
 // User Schema
 const User = require("../models/User.js");
 
-// Import Post model
-const Post = require("../models/Post.js");
+
 
 const getNewPost = (req, res) => {
   res.json({ user: req.user });
