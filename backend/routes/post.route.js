@@ -49,7 +49,6 @@ console.log('Post controller functions:', {
   deleteComment
 });
 
-const router = require('express').Router();
 const { isAuthenticated } = require('../middleware/auth');
 
 if (typeof getNewPost === 'function') {
