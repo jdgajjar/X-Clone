@@ -49,7 +49,6 @@ console.log('Post controller functions:', {
   deleteComment
 });
 
-const { isAuthenticated } = require('../middleware/auth');
 
 if (typeof getNewPost === 'function') {
   router.get('/post/new', isAuthenticated, getNewPost);
