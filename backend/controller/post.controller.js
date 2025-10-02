@@ -117,7 +117,7 @@ const createPost = async (req, res) => {
     let { content } = req.body;
     let userId = req.user ? req.user._id : req.session.userId;
 
-    // Debug: log incoming data
+    // Debug logging
     console.log('CREATE POST DEBUG:', {
       body: req.body,
       file: req.file,
@@ -128,37 +128,38 @@ const createPost = async (req, res) => {
       return res.status(401).json({ success: false, error: "Not authenticated" });
     }
 
-    if (!content) {
-      return res.status(400).json({ error: "Content is required", user: req.user });
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ error: "Content is required" });
     }
 
-    // Prepare image fields if file uploaded
+    // Handle image upload
     let image = undefined;
     if (req.file) {
-      let url = req.file.path;
-      if (!url.startsWith("http")) {
-        url = "/images/" + req.file.filename;
-      }
       image = {
-        url,
-        filename: req.file.filename,
+        url: req.file.path, // Cloudinary URL
+        filename: req.file.filename, // Cloudinary public_id
       };
-      console.log("Saving image with URL:", url); // Debug log
+      console.log("Image uploaded successfully:", image);
     }
 
     const post = new Post({
-      content,
+      content: content.trim(),
       author: userId,
       image,
     });
 
     await post.save();
 
-    // Notify all followers
+    // Populate author info for response
+    await post.populate('author', 'username profilePhoto IsVerified');
+
+    console.log("Post created successfully:", post._id);
+
+    // Notify followers (existing notification code)
     const User = require('../models/User');
-    const notificationController = require('../controller/notification.controller');
     const author = await User.findById(userId);
     if (author && author.followers && author.followers.length > 0) {
+      const notificationController = require('../controller/notification.controller');
       for (const followerId of author.followers) {
         await notificationController.createNotification({
           user: followerId,
@@ -170,13 +171,17 @@ const createPost = async (req, res) => {
       }
     }
 
-    // Always return JSON for API/React
     return res.status(201).json({ success: true, post });
   } catch (error) {
     console.error("Error creating post:", error);
-    res.status(500).json({ success: false, error: "An error occurred while creating the post." });
+    res.status(500).json({ 
+      success: false, 
+      error: "An error occurred while creating the post.",
+      details: error.message 
+    });
   }
 };
+
 
 const getEditPost = async (req, res) => {
   try {
