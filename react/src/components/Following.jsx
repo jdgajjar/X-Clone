@@ -51,7 +51,7 @@ const Following = ({ user, following = [], currentUser, onFollowToggle, randomus
                       className={`px-4 py-1.5 rounded-full font-bold transition-colors follow-button ${followingState[followedUser._id] ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-800 text-white hover:bg-gray-700'}`}
                       onClick={() => onFollowToggle(followedUser.username)}
                     >
-                      {followingState[followedUser._id] ? 'Following' : 'Follow'}
+                      {followingState[followedUser._id] ? 'Follow' : 'UnFollow'}
                     </button>
                   )}
                 </div>
