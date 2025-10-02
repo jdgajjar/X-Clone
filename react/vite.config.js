@@ -30,7 +30,7 @@ export default defineConfig({
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
   },
   // Handle environment-specific base URL
-  base: './',
+  base: '/',
   // Ensure _redirects file is copied to build
   publicDir: 'public',
 })
