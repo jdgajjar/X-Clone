@@ -85,7 +85,7 @@ const {
   profileImageStorage,
   profileCoverStorage,
   getProfileStorage,
-} = require("../cloudconflic.js");
+} = require("../cloudconflic");
 const multer = require("multer");
 const os = require("os");
 const fs = require("fs");
@@ -117,7 +117,7 @@ const createPost = async (req, res) => {
     let { content } = req.body;
     let userId = req.user ? req.user._id : req.session.userId;
 
-    // Debug logging
+    // Debug: log incoming data
     console.log('CREATE POST DEBUG:', {
       body: req.body,
       file: req.file,
@@ -128,38 +128,37 @@ const createPost = async (req, res) => {
       return res.status(401).json({ success: false, error: "Not authenticated" });
     }
 
-    if (!content || content.trim() === '') {
-      return res.status(400).json({ error: "Content is required" });
+    if (!content) {
+      return res.status(400).json({ error: "Content is required", user: req.user });
     }
 
-    // Handle image upload
+    // Prepare image fields if file uploaded
     let image = undefined;
     if (req.file) {
+      let url = req.file.path;
+      if (!url.startsWith("http")) {
+        url = "/images/" + req.file.filename;
+      }
       image = {
-        url: req.file.path, // Cloudinary URL
-        filename: req.file.filename, // Cloudinary public_id
+        url,
+        filename: req.file.filename,
       };
-      console.log("Image uploaded successfully:", image);
+      console.log("Saving image with URL:", url); // Debug log
     }
 
     const post = new Post({
-      content: content.trim(),
+      content,
       author: userId,
       image,
     });
 
     await post.save();
 
-    // Populate author info for response
-    await post.populate('author', 'username profilePhoto IsVerified');
-
-    console.log("Post created successfully:", post._id);
-
-    // Notify followers (existing notification code)
+    // Notify all followers
     const User = require('../models/User');
+    const notificationController = require('../controller/notification.controller');
     const author = await User.findById(userId);
     if (author && author.followers && author.followers.length > 0) {
-      const notificationController = require('../controller/notification.controller');
       for (const followerId of author.followers) {
         await notificationController.createNotification({
           user: followerId,
@@ -171,17 +170,13 @@ const createPost = async (req, res) => {
       }
     }
 
+    // Always return JSON for API/React
     return res.status(201).json({ success: true, post });
   } catch (error) {
     console.error("Error creating post:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: "An error occurred while creating the post.",
-      details: error.message 
-    });
+    res.status(500).json({ success: false, error: "An error occurred while creating the post." });
   }
 };
-
 
 const getEditPost = async (req, res) => {
   try {
