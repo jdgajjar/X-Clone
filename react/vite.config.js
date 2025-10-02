@@ -34,7 +34,7 @@ export default defineConfig({
   },
 
   // Base URL for relative paths (fixes nested route asset loading issues)
-  base: './',
+  base: '/',
 
   // Environment variables handling
   define: {
