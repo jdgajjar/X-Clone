@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { Router } = require('express');
+const router = express.Router(); // <-- declare router FIRST
 const mongoose = require('mongoose');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
@@ -8,12 +8,13 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
-const { cloudinary, poststorage, getProfileStorage } = require('../cloudconflic');
 const multer = require('multer');
 const os = require('os');
 const fs = require('fs');
 const methodOverride = require('method-override');
 
+const { cloudinary, poststorage, getProfileStorage } = require('../cloudconflic');
+const { isAuthenticated } = require('../middleware/auth');
 const Post = require('../models/Post.js');
 
 const {
@@ -32,7 +33,9 @@ const {
   deleteComment
 } = require('../controller/post.controller.js'); // path must match exactly
 
+const uploadPost = multer({ storage: poststorage });
 
+// Debug: check imported functions
 console.log('Post controller functions:', {
   getNewPost,
   createPost,
@@ -115,10 +118,7 @@ if (!getNewPost || !createPost || !getEditPost || !updatePost || !deletePost || 
   throw new Error('One or more post controller functions are undefined! Check post.controller.js exports.');
 }
 
-const router = Router();
-const { isAuthenticated } = require('../middleware/auth');
 
-const uploadPost = multer({ storage: poststorage });
 
 // ================= Routes =================
 
