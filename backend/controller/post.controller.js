@@ -85,7 +85,7 @@ const {
   profileImageStorage,
   profileCoverStorage,
   getProfileStorage,
-} = require("../cloudconflic");
+} = require("../cloudconflic.js");
 const multer = require("multer");
 const os = require("os");
 const fs = require("fs");
