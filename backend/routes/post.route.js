@@ -2,7 +2,7 @@ require('dotenv').config();
 const { Router } = require('express');
 const multer = require('multer');
 const Post = require('../models/Post.js');
-const { postStorage } = require('../cloudconflic'); // Updated import name
+const { poststorage } = require('../cloudconflic');
 const { isAuthenticated } = require('../middleware/auth');
 
 // Import controllers
@@ -23,23 +23,10 @@ const {
 } = require('../controller/post.controller.js');
 
 const router = Router();
+const uploadPost = multer({ storage: poststorage });
 
-// Configure multer for post images
-const uploadPost = multer({ 
-  storage: postStorage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'), false);
-    }
-  }
-});
-
-// Routes
+// ================= Routes =================
+// Only attach routes if controller exists
 if (typeof getNewPost === 'function') {
   router.get('/post/new', isAuthenticated, getNewPost);
 }
@@ -75,7 +62,7 @@ if (typeof getSinglePost === 'function') {
 
 if (typeof addReply === 'function') {
   router.post('/post/:postId/reply', isAuthenticated, addReply);
-  router.post('/posts/:postId/reply', isAuthenticated, addReply);
+  router.post('/posts/:postId/reply', isAuthenticated, addReply); // alias
 }
 
 if (typeof getComments === 'function') {
@@ -98,10 +85,10 @@ if (typeof deleteComment === 'function') {
   router.delete('/posts/:postId/comments/:commentId/delete', isAuthenticated, deleteComment);
 }
 
-// API routes for fetching posts
+// Optional API routes for fetching posts
 router.get('/api/post/:id', async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate('author', 'username profilePhoto IsVerified').lean();
+    const post = await Post.findById(req.params.id).lean();
     if (!post) return res.status(404).json({ error: 'Post not found' });
     res.json({ post });
   } catch (err) {
@@ -116,16 +103,9 @@ router.get('/api/posts', async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .populate('author', 'username profilePhoto IsVerified')
       .lean();
-    
-    res.json({ 
-      posts, 
-      currentPage: parseInt(page), 
-      totalPages: Math.ceil(await Post.countDocuments() / limit) 
-    });
+    res.json({ posts, currentPage: page, totalPages: Math.ceil(await Post.countDocuments() / limit) });
   } catch (err) {
-    console.error('Error fetching posts:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
