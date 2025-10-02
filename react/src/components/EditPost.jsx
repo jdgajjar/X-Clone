@@ -1,157 +1,125 @@
 import React, { useState } from "react";
+import { useDispatch, useSelector, shallowEqual } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { editProfileThunk } from "../config/redux/action/profileAction";
 import Loading from "./Loading";
-import { useParams, useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { editPostThunk } from "../config/redux/action/postAction";
-import { fetchPostThunk } from "../config/redux/action/postAction";
 
 
-const EditPost = ({ user }) => {
-  const params = useParams();
-  const id = params.id;
-  const navigate = useNavigate();
+const EditProfile = ({ user, onCancel }) => {
   const dispatch = useDispatch();
-  // Debug: log params and id
-  React.useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('EditPost useParams:', params, 'id:', id);
-  }, [params, id]);
-  const [content, setContent] = useState("");
-  const [image, setImage] = useState(null);
-  const [post, setPost] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [deletingImage, setDeletingImage] = useState(false);
-  const [imageMarkedForDelete, setImageMarkedForDelete] = useState(false);
+  const navigate = useNavigate();
+  // Use shallowEqual to prevent unnecessary rerenders
+  const { loading } = useSelector(state => ({ loading: state.profile?.loading }), shallowEqual);
+  const [form, setForm] = useState({
+    username: user.username || "",
+    email: user.email || "",
+    profilePhoto: null,
+    coverPhoto: null,
+  });
+  const [localLoading, setLocalLoading] = useState(false);
 
-  React.useEffect(() => {
-    if (!id) return;
-    async function fetchPost() {
-      try {
-        const resultAction = await dispatch(fetchPostThunk(id));
-        if (fetchPostThunk.fulfilled.match(resultAction)) {
-          const data = resultAction.payload;
-          setPost(data.post || data);
-          setContent((data.post || data).content || "");
-        } else {
-          setError(resultAction.payload || "Post not found");
-        }
-      } catch (err) {
-        setError("Post not found");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchPost();
-  }, [id]);
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleFileChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.files[0] });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
-    setLoading(true);
-    if (!id) {
-      setError("Invalid post ID.");
-      setLoading(false);
-      return;
-    }
-    const formData = new FormData();
-    formData.append("content", content);
-    if (image) formData.append("image", image);
-    if (imageMarkedForDelete) formData.append("deleteImage", "1");
-    try {
-      const resultAction = await dispatch(editPostThunk({ id, formData }));
-      if (editPostThunk.fulfilled.match(resultAction)) {
-        setSuccess("Post updated successfully!");
-        setTimeout(() => navigate(`/post/${id}`), 1000);
-      } else {
-        setError(resultAction.payload || "Failed to update post");
-        setLoading(false);
-      }
-    } catch (err) {
-      setError("Failed to update post");
-      setLoading(false);
+    setLocalLoading(true);
+    const resultAction = await dispatch(editProfileThunk(form));
+    setLocalLoading(false);
+    if (editProfileThunk.fulfilled.match(resultAction)) {
+      navigate(`/profile/${form.username}`);
     }
   };
 
-  const handleDeleteImage = () => {
-    setImageMarkedForDelete(true);
-  };
+  const showLoading = loading || localLoading;
 
-  if (loading) return <Loading />;
-  if (!id) return <div className="text-center text-red-500 py-10">Invalid or missing post ID in URL.</div>;
-  if (error) return <div className="text-center text-red-500 py-10">{error}</div>;
-  if (!post) return <Loading />;
   return (
-    <div className="bg-black text-white min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-xl bg-[#16181C] rounded-lg p-6 shadow-md">
-        <h1 className="text-2xl font-bold mb-6">Edit Post</h1>
-        {success && <div className="text-green-400 mb-4">{success}</div>}
-        {error && <div className="text-red-400 mb-4">{error}</div>}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="mb-6">
-            <label htmlFor="edit-content" className="block text-sm font-medium text-gray-300 mb-2">Edit Post</label>
-            <textarea
-              name="content"
-              id="edit-content"
-              rows={6}
-              required
-              className="w-full p-4 bg-gray-800 text-gray-200 border border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-700 focus:border-gray-700 placeholder-gray-500 resize-none shadow-sm"
-              placeholder="What's on your mind?"
-              value={content}
-              onChange={e => setContent(e.target.value)}
-            />
-          </div>
-          {post?.image?.url && !imageMarkedForDelete && (
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-500 mb-2">Current Image</label>
-              <div className="relative w-full max-w-md rounded-lg overflow-hidden shadow-sm border border-gray-300 bg-gray-50">
-                <img src={post.image.url} alt="Post Image" className="w-full h-auto object-cover rounded-md transition-transform duration-300 hover:scale-105" />
-                <button type="button" title="Delete Image" onClick={handleDeleteImage} className="absolute top-2 right-2 bg-black bg-opacity-70 hover:bg-red-600 text-white rounded-full p-1 transition-colors border-2 border-transparent hover:border-red-500 z-10">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+    <div className="bg-black text-white min-h-screen font-sans">
+      <header className="flex items-center p-4 border-b border-gray-700">
+        <h1 className="text-2xl font-bold">Edit Profile</h1>
+      </header>
+      {showLoading ? (
+        <div className="flex items-center justify-center min-h-[80vh]">
+          <Loading />
+        </div>
+      ) : (
+        <main className="flex justify-center mt-8">
+          <form className="bg-black w-full max-w-md p-6 space-y-6" onSubmit={handleSubmit} encType="multipart/form-data">
+            {/* Username */}
+            <div className="space-y-2">
+              <label htmlFor="username" className="text-gray-400 text-sm">Username</label>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                value={form.username}
+                onChange={handleChange}
+                className="w-full bg-transparent border border-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Username"
+              />
             </div>
-          )}
-          <div className="mb-6">
-            <label htmlFor="image" className="block text-sm font-medium text-gray-300 mb-2">Change Image</label>
-            <input
-              type="file"
-              name="image"
-              id="image"
-              accept="image/*"
-              className="block w-full text-sm text-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer"
-              onChange={e => setImage(e.target.files[0])}
-            />
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-4">
-            <button
-              type="button"
-              className="text-red-400 hover:text-red-500 font-medium transition text-center sm:text-left"
-              onClick={() => {
-                setLoading(true);
-                setImageMarkedForDelete(false);
-                setTimeout(() => navigate(`/post/${id}`), 300);
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-6 rounded-full transition text-center sm:text-left"
-              disabled={!id || loading || !content.trim()}
-            >
-              Update
-            </button>
-           
-          </div>
-        </form>
-      </div>
+            {/* Email */}
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-gray-400 text-sm">Email</label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                className="w-full bg-transparent border border-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Email"
+              />
+            </div>
+            {/* Profile Image Upload */}
+            <div className="space-y-2">
+              <label htmlFor="profilePhoto" className="text-gray-400 text-sm">Profile Image</label>
+              <input
+                type="file"
+                id="profilePhoto"
+                name="profilePhoto"
+                accept="image/*"
+                className="block w-full text-sm text-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer"
+                onChange={handleFileChange}
+              />
+              {user.profilePhoto?.url && (
+                <img src={user.profilePhoto.url} alt="Profile" className="w-20 h-20 rounded-full mt-2" />
+              )}
+            </div>
+            {/* Cover Image Upload */}
+            <div className="space-y-2">
+              <label htmlFor="coverPhoto" className="text-gray-400 text-sm">Cover Image</label>
+              <input
+                type="file"
+                id="coverPhoto"
+                name="coverPhoto"
+                accept="image/*"
+                className="block w-full text-sm text-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer"
+                onChange={handleFileChange}
+              />
+              {user.coverPhoto?.url && (
+                <img src={user.coverPhoto.url} alt="Cover" className="w-full h-32 object-cover mt-2 rounded" />
+              )}
+            </div>
+            {/* Buttons */}
+            <div className="flex justify-between pt-4">
+              <button type="button" onClick={onCancel} className="px-6 py-2 bg-transparent border border-gray-700 rounded-full text-white hover:bg-gray-800 transition">
+                Cancel
+              </button>
+              <button type="submit" className="px-6 py-2 bg-white text-black font-bold rounded-full hover:bg-gray-200 transition">
+                Save
+              </button>
+            </div>
+          </form>
+        </main>
+      )}
     </div>
   );
 };
 
-export default EditPost;
+export default EditProfile;
