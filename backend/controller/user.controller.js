@@ -719,71 +719,92 @@ const editProfilePage =  async (req, res) => {
     }
   };
 
-  const updateProfile =  async (req, res) => {
-      try {
-        const { username, email } = req.body;
-        const userId = req.user ? req.user._id : req.session.userId;
-        if (!userId) return res.status(400).redirect("/");
-        let user = await User.findById(userId);
-        if (!user) return res.status(404).redirect("/");
-        user.username = username;
-        user.email = email;
-        // Store profile image and delete previous if not default
-        if (req.files && req.files.Image && req.files.Image[0]) {
-          // Delete previous profile image from Cloudinary if not default
-          if (user.profilePhoto && user.profilePhoto.filename && user.profilePhoto.filename !== "profile_images") {
-            try {
-              await cloudinary.uploader.destroy(user.profilePhoto.filename);
-            } catch (err) {
-              console.error("Error deleting previous profile photo from Cloudinary:", err);
-            }
-          }
-          const result = await cloudinary.uploader.upload(
-            req.files.Image[0].path,
-            { folder: "profile_images" }
-          );
-          user.profilePhoto = {
-            url: result.secure_url,
-            filename: result.public_id,
-          };
-          fs.unlink(req.files.Image[0].path, () => {});
-        }
-        // Store cover image and delete previous if not default
-        if (req.files && req.files.cover && req.files.cover[0]) {
-          if (user.coverPhoto && user.coverPhoto.filename && user.coverPhoto.filename !== "profile_covers") {
-            try {
-              await cloudinary.uploader.destroy(user.coverPhoto.filename);
-            } catch (err) {
-              console.error("Error deleting previous cover photo from Cloudinary:", err);
-            }
-          }
-          const result = await cloudinary.uploader.upload(
-            req.files.cover[0].path,
-            { folder: "profile_covers" }
-          );
-          user.coverPhoto = {
-            url: result.secure_url,
-            filename: result.public_id,
-          };
-          fs.unlink(req.files.cover[0].path, () => {});
-        }
-        await user.save();
-        // If request is AJAX/JSON (React), return updated user as JSON
-        if (req.xhr || req.headers.accept.indexOf('json') > -1) {
-          user = await User.findById(userId); // re-fetch for latest
-          return res.json({ success: true, user });
-        } else {
-          res.redirect("/");
-        }
-      } catch (error) {
-        console.error("Profile update error:", error);
-        if (req.xhr || req.headers.accept.indexOf('json') > -1) {
-          res.status(500).json({ success: false, error: "Profile update failed" });
-        } else {
-          res.status(500).redirect("/");
+  const updateProfile = async (req, res) => {
+  try {
+    const { username, email } = req.body;
+    const userId = req.user ? req.user._id : req.session.userId;
+
+    if (!userId) return res.status(400).json({ error: "Not authenticated" });
+
+    let user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Update basic info
+    user.username = username;
+    user.email = email;
+
+    // Handle profile image upload (field name: profilePhoto)
+    if (req.files && req.files.profilePhoto && req.files.profilePhoto[0]) {
+      // Delete previous profile image from Cloudinary if not default
+      if (user.profilePhoto && user.profilePhoto.filename && user.profilePhoto.filename !== "profile_images") {
+        try {
+          await cloudinary.uploader.destroy(user.profilePhoto.filename);
+        } catch (err) {
+          console.error("Error deleting previous profile photo:", err);
         }
       }
-    };
+
+      const result = await cloudinary.uploader.upload(
+        req.files.profilePhoto[0].path,
+        { folder: "profile_images" }
+      );
+
+      user.profilePhoto = {
+        url: result.secure_url,
+        filename: result.public_id,
+      };
+
+      // Clean up temp file
+      const fs = require('fs');
+      fs.unlink(req.files.profilePhoto[0].path, () => {});
+    }
+
+    // Handle cover image upload (field name: coverPhoto)
+    if (req.files && req.files.coverPhoto && req.files.coverPhoto[0]) {
+      // Delete previous cover image from Cloudinary if not default
+      if (user.coverPhoto && user.coverPhoto.filename && user.coverPhoto.filename !== "profile_covers") {
+        try {
+          await cloudinary.uploader.destroy(user.coverPhoto.filename);
+        } catch (err) {
+          console.error("Error deleting previous cover photo:", err);
+        }
+      }
+
+      const result = await cloudinary.uploader.upload(
+        req.files.coverPhoto[0].path,
+        { folder: "profile_covers" }
+      );
+
+      user.coverPhoto = {
+        url: result.secure_url,
+        filename: result.public_id,
+      };
+
+      // Clean up temp file
+      const fs = require('fs');
+      fs.unlink(req.files.coverPhoto[0].path, () => {});
+    }
+
+    await user.save();
+
+    // Return updated user
+    const updatedUser = await User.findById(userId).select('-password');
+    
+    if (req.xhr || req.headers.accept.indexOf('json') > -1) {
+      return res.json({ success: true, user: updatedUser });
+    } else {
+      res.redirect(`/profile/${user.username}`);
+    }
+  } catch (error) {
+    console.error("Profile update error:", error);
+    if (req.xhr || req.headers.accept.indexOf('json') > -1) {
+      res.status(500).json({ success: false, error: "Profile update failed", details: error.message });
+    } else {
+      res.status(500).redirect("/");
+    }
+  }
+};
+
 
 
     const getBookmarks = async (req, res) => {
