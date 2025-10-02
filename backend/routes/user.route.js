@@ -105,7 +105,7 @@ router.get('/profile/:username/followers', isAuthenticated, getFollowers);
 router.post('/profile/:username/follow', isAuthenticated, followUser);
 router.post('/profile/:username/unfollow', isAuthenticated, unfollowUser);
 router.get('/profile/:id/edit', isAuthenticated, uploadProfileImage.single('Image'), editProfilePage);
-// Accept both profile and cover image uploads
+// Configure multer for profile uploads with temporary storage
 const uploadProfile = multer({
   storage: multer.diskStorage({
     destination: function (req, file, cb) {
@@ -115,10 +115,23 @@ const uploadProfile = multer({
       cb(null, Date.now() + '-' + file.originalname);
     }
   }),
-  fileFilter: (req, file, cb) => cb(null, true)
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
 });
-router.post('/profile/edit', isAuthenticated, uploadProfile.fields([{ name: 'Image' }, { name: 'cover' }]), updateProfile);
 
+// Profile update route with correct field names
+router.post('/profile/edit', isAuthenticated, uploadProfile.fields([
+  { name: 'profilePhoto', maxCount: 1 }, 
+  { name: 'coverPhoto', maxCount: 1 }
+]), updateProfile);
 // API route for React profile fetch
 router.get('/api/profile/:username', getProfileApi);
 // API endpoints for followers/following (React)
