@@ -8,24 +8,20 @@ cloudinary.config({
 });
 
 // Storage for posts
-const postStorage = new CloudinaryStorage({
+const poststorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: "posts",
-    allowed_formats: ["jpg", "png", "jpeg", "gif", "webp"],
-    resource_type: "image",
-    transformation: [{ width: 1200, height: 630, crop: "limit", quality: "auto" }]
+    allowed_formats: ["jpg", "png", "jpeg"],
   },
 });
 
-// Storage for profile images  
+// Storage for profile images
 const profileImageStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: "profile_images",
-    allowed_formats: ["jpg", "png", "jpeg", "gif", "webp"],
-    resource_type: "image",
-    transformation: [{ width: 400, height: 400, crop: "fill", quality: "auto" }]
+    allowed_formats: ["jpg", "png", "jpeg"],
   },
 });
 
@@ -33,16 +29,40 @@ const profileImageStorage = new CloudinaryStorage({
 const profileCoverStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: "profile_covers", 
-    allowed_formats: ["jpg", "png", "jpeg", "gif", "webp"],
-    resource_type: "image",
-    transformation: [{ width: 1200, height: 400, crop: "fill", quality: "auto" }]
+    folder: "profile_covers",
+    allowed_formats: ["jpg", "png", "jpeg"],
   },
 });
 
+// Dynamic storage selector (based on fieldname)
+function getProfileStorage(req, file, cb) {
+  let storage;
+  if (file.fieldname === "Image") {
+    storage = new CloudinaryStorage({
+      cloudinary: cloudinary,
+      params: {
+        folder: "profile_images",
+        allowed_formats: ["jpg", "png", "jpeg"],
+      },
+    });
+  } else if (file.fieldname === "cover") {
+    storage = new CloudinaryStorage({
+      cloudinary: cloudinary,
+      params: {
+        folder: "profile_covers",
+        allowed_formats: ["jpg", "png", "jpeg"],
+      },
+    });
+  } else {
+    storage = poststorage;
+  }
+  cb(null, storage);
+}
+
 module.exports = {
   cloudinary,
-  postStorage,
+  poststorage,
   profileImageStorage,
   profileCoverStorage,
+  getProfileStorage,
 };
