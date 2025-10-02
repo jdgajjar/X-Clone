@@ -1,6 +1,7 @@
 // FIXED post.controller.js - Remove the duplicate getComments export
-// Import Post model
+// Import required models and dependencies
 const Post = require("../models/Post.js");
+const { cloudinary } = require("../cloudconflic");
 
 // Utility: Remove all replies with author missing or username 'Unknown' from all posts
 async function deleteUnknownCommentsFromAllPosts() {
@@ -117,10 +118,15 @@ const createPost = async (req, res) => {
     let { content } = req.body;
     let userId = req.user ? req.user._id : req.session.userId;
 
-    // Debug: log incoming data
-    console.log('CREATE POST DEBUG:', {
+    // Debug: log incoming data for Render.com troubleshooting
+    console.log('CREATE POST DEBUG (Render.com):', {
       body: req.body,
-      file: req.file,
+      file: req.file ? { 
+        filename: req.file.filename, 
+        path: req.file.path,
+        mimetype: req.file.mimetype,
+        size: req.file.size 
+      } : null,
       userId
     });
 
@@ -128,26 +134,66 @@ const createPost = async (req, res) => {
       return res.status(401).json({ success: false, error: "Not authenticated" });
     }
 
-    if (!content) {
-      return res.status(400).json({ error: "Content is required", user: req.user });
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ success: false, error: "Content is required" });
     }
 
-    // Prepare image fields if file uploaded
+    // Handle image upload for Render.com deployment
     let image = undefined;
     if (req.file) {
-      let url = req.file.path;
-      if (!url.startsWith("http")) {
-        url = "/images/" + req.file.filename;
+      try {
+        // Validate image file
+        const { validateImageFile } = require('../cloudconflic');
+        validateImageFile(req.file);
+
+        // For Cloudinary uploads, the file.path contains the Cloudinary URL
+        let imageUrl = req.file.path;
+        let imageFilename = req.file.filename;
+        
+        // Check if it's a Cloudinary URL (already uploaded by multer-storage-cloudinary)
+        if (imageUrl.startsWith('http')) {
+          // File was uploaded to Cloudinary via multer-storage-cloudinary
+          image = {
+            url: imageUrl,
+            filename: imageFilename,
+          };
+          console.log("Post image uploaded to Cloudinary:", imageUrl);
+        } else {
+          // Fallback: manual Cloudinary upload for Render.com compatibility
+          const uploadOptions = {
+            folder: "posts",
+            transformation: [
+              { width: 1200, height: 1200, crop: "limit" },
+              { quality: "auto" },
+              { fetch_format: "auto" }
+            ],
+            resource_type: "auto"
+          };
+          
+          const result = await cloudinary.uploader.upload(imageUrl, uploadOptions);
+          
+          image = {
+            url: result.secure_url,
+            filename: result.public_id,
+          };
+          
+          // Clean up temp file
+          const { cleanupTempFile } = require('../cloudconflic');
+          cleanupTempFile(imageUrl);
+          
+          console.log("Post image manually uploaded to Cloudinary:", result.secure_url);
+        }
+      } catch (imageError) {
+        console.error("Post image upload error:", imageError);
+        return res.status(400).json({ 
+          success: false, 
+          error: imageError.message || "Image upload failed" 
+        });
       }
-      image = {
-        url,
-        filename: req.file.filename,
-      };
-      console.log("Saving image with URL:", url); // Debug log
     }
 
     const post = new Post({
-      content,
+      content: content.trim(),
       author: userId,
       image,
     });
@@ -270,28 +316,65 @@ const updatePost = async (req, res) => {
       const updatedPost = await Post.findById(postId);
       return res.json({ post: updatedPost, user: req.user });
     } else if (req.file) {
-      // Delete old image from Cloudinary if it exists
-      if (
-        post.image &&
-        post.image.url &&
-        post.image.filename &&
-        post.image.url.startsWith("http")
-      ) {
-        try {
-          await cloudinary.uploader.destroy(post.image.filename);
-        } catch (imgErr) {
-          console.error(
-            "Error deleting old post image from Cloudinary:",
-            imgErr
-          );
-        }
-      }
+      // Handle new image upload for Render.com
+      try {
+        // Validate image file
+        const { validateImageFile } = require('../cloudconflic');
+        validateImageFile(req.file);
 
-      post.image = {
-        url: req.file.path, // Cloudinary URL
-        filename: req.file.filename, // Cloudinary public_id
-      };
-      console.log("Updated post.image:", post.image);
+        // Delete old image from Cloudinary if it exists
+        if (post.image && post.image.filename && post.image.url && post.image.url.startsWith("http")) {
+          try {
+            await cloudinary.uploader.destroy(post.image.filename);
+            console.log("Old post image deleted from Cloudinary:", post.image.filename);
+          } catch (imgErr) {
+            console.log("Error deleting old post image (non-critical):", imgErr.message);
+          }
+        }
+
+        // Handle Cloudinary upload for Render.com
+        let imageUrl = req.file.path;
+        let imageFilename = req.file.filename;
+        
+        if (imageUrl.startsWith('http')) {
+          // File was uploaded to Cloudinary via multer-storage-cloudinary
+          post.image = {
+            url: imageUrl,
+            filename: imageFilename,
+          };
+        } else {
+          // Fallback: manual Cloudinary upload
+          const uploadOptions = {
+            folder: "posts",
+            transformation: [
+              { width: 1200, height: 1200, crop: "limit" },
+              { quality: "auto" },
+              { fetch_format: "auto" }
+            ],
+            resource_type: "auto"
+          };
+          
+          const result = await cloudinary.uploader.upload(imageUrl, uploadOptions);
+          
+          post.image = {
+            url: result.secure_url,
+            filename: result.public_id,
+          };
+          
+          // Clean up temp file
+          const { cleanupTempFile } = require('../cloudconflic');
+          cleanupTempFile(imageUrl);
+        }
+        
+        console.log("Updated post image (Render.com):", post.image);
+        
+      } catch (imageError) {
+        console.error("Post image update error:", imageError);
+        return res.status(400).json({ 
+          success: false, 
+          error: imageError.message || "Image upload failed" 
+        });
+      }
     } else if (!post.image) {
       // If no image uploaded and no image object, set image to undefined
       post.image = undefined;

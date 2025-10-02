@@ -105,19 +105,39 @@ router.get('/profile/:username/followers', isAuthenticated, getFollowers);
 router.post('/profile/:username/follow', isAuthenticated, followUser);
 router.post('/profile/:username/unfollow', isAuthenticated, unfollowUser);
 router.get('/profile/:id/edit', isAuthenticated, uploadProfileImage.single('Image'), editProfilePage);
-// Accept both profile and cover image uploads
+// Accept both profile and cover image uploads - Render.com optimized
 const uploadProfile = multer({
   storage: multer.diskStorage({
     destination: function (req, file, cb) {
-      cb(null, os.tmpdir());
+      // Use system temp directory which is more reliable on Render.com
+      const tempDir = os.tmpdir();
+      cb(null, tempDir);
     },
     filename: function (req, file, cb) {
-      cb(null, Date.now() + '-' + file.originalname);
+      // Generate unique filename to avoid conflicts
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, file.fieldname + '-' + uniqueSuffix + '-' + file.originalname);
     }
   }),
-  fileFilter: (req, file, cb) => cb(null, true)
+  fileFilter: (req, file, cb) => {
+    // Enhanced file validation for Render.com
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'));
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 2 // Max 2 files (profile + cover)
+  }
 });
-router.post('/profile/edit', isAuthenticated, uploadProfile.fields([{ name: 'Image' }, { name: 'cover' }]), updateProfile);
+
+router.post('/profile/edit', isAuthenticated, uploadProfile.fields([
+  { name: 'Image', maxCount: 1 }, 
+  { name: 'cover', maxCount: 1 }
+]), updateProfile);
 
 // API route for React profile fetch
 router.get('/api/profile/:username', getProfileApi);

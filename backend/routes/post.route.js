@@ -23,7 +23,23 @@ const {
 } = require('../controller/post.controller.js');
 
 const router = Router();
-const uploadPost = multer({ storage: poststorage });
+// Enhanced multer configuration for Render.com post uploads
+const uploadPost = multer({
+  storage: poststorage,
+  fileFilter: (req, file, cb) => {
+    // Enhanced file validation for Render.com
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'));
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 1 // Max 1 file per post
+  }
+});
 
 // ================= Routes =================
 // Only attach routes if controller exists

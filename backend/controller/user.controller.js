@@ -1,3 +1,9 @@
+// Required imports
+const { cloudinary } = require('../cloudconflic');
+const User = require('../models/User');
+const Post = require('../models/Post');
+const fs = require('fs');
+
 // API: Get current user for React
 const getCurrentUserApi = async (req, res) => {
   try {
@@ -719,71 +725,144 @@ const editProfilePage =  async (req, res) => {
     }
   };
 
-  const updateProfile =  async (req, res) => {
-      try {
-        const { username, email } = req.body;
-        const userId = req.user ? req.user._id : req.session.userId;
-        if (!userId) return res.status(400).redirect("/");
-        let user = await User.findById(userId);
-        if (!user) return res.status(404).redirect("/");
-        user.username = username;
-        user.email = email;
-        // Store profile image and delete previous if not default
-        if (req.files && req.files.Image && req.files.Image[0]) {
+  const updateProfile = async (req, res) => {
+    try {
+      const { username, email } = req.body;
+      const userId = req.user ? req.user._id : req.session.userId;
+      
+      if (!userId) {
+        return res.status(401).json({ success: false, error: "Not authenticated" });
+      }
+      
+      let user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ success: false, error: "User not found" });
+      }
+      
+      // Update basic fields
+      if (username) user.username = username.trim();
+      if (email) user.email = email.trim();
+      
+      // Handle profile image upload (Render.com optimized)
+      if (req.files && req.files.Image && req.files.Image[0]) {
+        try {
+          const imageFile = req.files.Image[0];
+          
+          // Validate image file
+          const { validateImageFile } = require('../cloudconflic');
+          validateImageFile(imageFile);
+          
           // Delete previous profile image from Cloudinary if not default
-          if (user.profilePhoto && user.profilePhoto.filename && user.profilePhoto.filename !== "profile_images") {
+          if (user.profilePhoto && user.profilePhoto.filename && 
+              !user.profilePhoto.filename.includes("profile_offakc")) {
             try {
               await cloudinary.uploader.destroy(user.profilePhoto.filename);
+              console.log("Previous profile image deleted:", user.profilePhoto.filename);
             } catch (err) {
-              console.error("Error deleting previous profile photo from Cloudinary:", err);
+              console.log("Error deleting previous profile photo (non-critical):", err.message);
             }
           }
-          const result = await cloudinary.uploader.upload(
-            req.files.Image[0].path,
-            { folder: "profile_images" }
-          );
+          
+          // Upload to Cloudinary with optimizations for Render.com
+          const uploadOptions = {
+            folder: "profile_images",
+            transformation: [
+              { width: 400, height: 400, crop: "fill", gravity: "face" },
+              { quality: "auto" },
+              { fetch_format: "auto" }
+            ],
+            resource_type: "auto"
+          };
+          
+          const result = await cloudinary.uploader.upload(imageFile.path, uploadOptions);
+          
           user.profilePhoto = {
             url: result.secure_url,
             filename: result.public_id,
           };
-          fs.unlink(req.files.Image[0].path, () => {});
+          
+          // Clean up temp file (Render.com friendly)
+          const { cleanupTempFile } = require('../cloudconflic');
+          cleanupTempFile(imageFile.path);
+          
+        } catch (imageError) {
+          console.error("Profile image upload error:", imageError);
+          return res.status(400).json({ 
+            success: false, 
+            error: imageError.message || "Profile image upload failed" 
+          });
         }
-        // Store cover image and delete previous if not default
-        if (req.files && req.files.cover && req.files.cover[0]) {
-          if (user.coverPhoto && user.coverPhoto.filename && user.coverPhoto.filename !== "profile_covers") {
+      }
+      
+      // Handle cover image upload (Render.com optimized)
+      if (req.files && req.files.cover && req.files.cover[0]) {
+        try {
+          const coverFile = req.files.cover[0];
+          
+          // Validate image file
+          const { validateImageFile } = require('../cloudconflic');
+          validateImageFile(coverFile);
+          
+          // Delete previous cover image from Cloudinary if exists
+          if (user.coverPhoto && user.coverPhoto.filename) {
             try {
               await cloudinary.uploader.destroy(user.coverPhoto.filename);
+              console.log("Previous cover image deleted:", user.coverPhoto.filename);
             } catch (err) {
-              console.error("Error deleting previous cover photo from Cloudinary:", err);
+              console.log("Error deleting previous cover photo (non-critical):", err.message);
             }
           }
-          const result = await cloudinary.uploader.upload(
-            req.files.cover[0].path,
-            { folder: "profile_covers" }
-          );
+          
+          // Upload to Cloudinary with optimizations for Render.com
+          const uploadOptions = {
+            folder: "profile_covers",
+            transformation: [
+              { width: 1500, height: 500, crop: "fill" },
+              { quality: "auto" },
+              { fetch_format: "auto" }
+            ],
+            resource_type: "auto"
+          };
+          
+          const result = await cloudinary.uploader.upload(coverFile.path, uploadOptions);
+          
           user.coverPhoto = {
             url: result.secure_url,
             filename: result.public_id,
           };
-          fs.unlink(req.files.cover[0].path, () => {});
-        }
-        await user.save();
-        // If request is AJAX/JSON (React), return updated user as JSON
-        if (req.xhr || req.headers.accept.indexOf('json') > -1) {
-          user = await User.findById(userId); // re-fetch for latest
-          return res.json({ success: true, user });
-        } else {
-          res.redirect("/");
-        }
-      } catch (error) {
-        console.error("Profile update error:", error);
-        if (req.xhr || req.headers.accept.indexOf('json') > -1) {
-          res.status(500).json({ success: false, error: "Profile update failed" });
-        } else {
-          res.status(500).redirect("/");
+          
+          // Clean up temp file (Render.com friendly)
+          const { cleanupTempFile } = require('../cloudconflic');
+          cleanupTempFile(coverFile.path);
+          
+        } catch (coverError) {
+          console.error("Cover image upload error:", coverError);
+          return res.status(400).json({ 
+            success: false, 
+            error: coverError.message || "Cover image upload failed" 
+          });
         }
       }
-    };
+      
+      // Save user with updated data
+      await user.save();
+      console.log("Profile updated successfully for user:", user.username);
+      
+      // Return updated user data
+      const updatedUser = await User.findById(userId)
+        .select('_id username email profilePhoto coverPhoto IsVerified')
+        .lean();
+      
+      return res.json({ success: true, user: updatedUser });
+      
+    } catch (error) {
+      console.error("Profile update error:", error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message || "Profile update failed. Please try again." 
+      });
+    }
+  };
 
 
     const getBookmarks = async (req, res) => {

@@ -14,6 +14,8 @@ const {
   profileImageStorage,
   profileCoverStorage,
   getProfileStorage,
+  cleanupTempFile,
+  validateImageFile,
 } = require("./cloudconflic");
 const multer = require("multer");
 const os = require("os");
@@ -369,6 +371,64 @@ app.get('/api/status', (req, res) => {
     status: 'active',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Enhanced error handling middleware for Render.com deployment
+app.use((error, req, res, next) => {
+  console.error('Application Error:', error);
+  
+  // Multer file upload errors
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'File too large. Maximum size is 5MB.' 
+      });
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Too many files. Maximum is 2 files.' 
+      });
+    }
+    return res.status(400).json({ 
+      success: false, 
+      error: `File upload error: ${error.message}` 
+    });
+  }
+  
+  // Cloudinary errors
+  if (error.message && error.message.includes('cloudinary')) {
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Image processing failed. Please try again.' 
+    });
+  }
+  
+  // File validation errors
+  if (error.message && (error.message.includes('Invalid file type') || error.message.includes('File too large'))) {
+    return res.status(400).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+  
+  // MongoDB/Mongoose errors
+  if (error.name === 'ValidationError') {
+    const messages = Object.values(error.errors).map(err => err.message);
+    return res.status(400).json({ 
+      success: false, 
+      error: messages.join(', ') 
+    });
+  }
+  
+  // Generic server error for production
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.status(500).json({ 
+    success: false, 
+    error: isProduction ? 'Internal server error' : error.message,
+    ...(isProduction ? {} : { stack: error.stack })
   });
 });
 
