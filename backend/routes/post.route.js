@@ -33,6 +33,13 @@ const {
 } = require('../controller/post.controller.js');
 
 
+console.log('Post controller functions:', {
+  getSinglePost,
+  getNewPost,
+  createPost
+});
+
+
 // ✅ Ensure all imported controller functions exist
 if (!getNewPost || !createPost || !getEditPost || !updatePost || !deletePost || !likePost || !bookmarkPost || !getSinglePost || !addReply || !getComments || !likeComment || !editComment || !deleteComment) {
   throw new Error('One or more post controller functions are undefined! Check post.controller.js exports.');
