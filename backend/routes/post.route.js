@@ -8,15 +8,12 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
-// Passport and Google OAuth removed - using session-based authentication only
 const { cloudinary, poststorage, getProfileStorage } = require('../cloudconflic');
 const multer = require('multer');
 const os = require('os');
 const fs = require('fs');
-const uploadPost = multer({ storage: poststorage });
 const methodOverride = require('method-override');
 
-// Import Post model
 const Post = require('../models/Post.js');
 
 const {
@@ -35,12 +32,19 @@ const {
   deleteComment
 } = require('../controller/post.controller.js');
 
+// ✅ Ensure all imported controller functions exist
+if (!getNewPost || !createPost || !getEditPost || !updatePost || !deletePost || !likePost || !bookmarkPost || !getSinglePost || !addReply || !getComments || !likeComment || !editComment || !deleteComment) {
+  throw new Error('One or more post controller functions are undefined! Check post.controller.js exports.');
+}
+
 const router = Router();
 const { isAuthenticated } = require('../middleware/auth');
 
+const uploadPost = multer({ storage: poststorage });
 
+// ================= Routes =================
 
-//New post
+// New post
 router.get('/post/new', isAuthenticated, getNewPost);
 router.post('/api/post/new', isAuthenticated, uploadPost.single('image'), createPost);
 
@@ -48,10 +52,9 @@ router.post('/api/post/new', isAuthenticated, uploadPost.single('image'), create
 router.get('/post/:id/edit', isAuthenticated, getEditPost);
 router.put('/api/post/:id/edit', isAuthenticated, uploadPost.single('image'), updatePost);
 
-
-
 // Delete post
 router.delete('/api/post/:id/delete', isAuthenticated, deletePost);
+router.post('/post/:id/delete', isAuthenticated, deletePost); // compatibility
 
 // Like/Unlike post
 router.post('/post/:id/like', isAuthenticated, likePost);
@@ -62,28 +65,21 @@ router.post('/post/:id/bookmark', isAuthenticated, bookmarkPost);
 // View single post
 router.get('/post/:id', getSinglePost);
 
-// Add a reply to a post
+// Comments & replies
 router.post('/post/:postId/reply', isAuthenticated, addReply);
-// Fetch comments for a post
 router.get('/post/:postId/comments', getComments);
-// Like/unlike a comment
 router.post('/post/:postId/comments/:commentId/like', isAuthenticated, likeComment);
-// Edit a comment
 router.put('/post/:postId/comments/:commentId/edit', isAuthenticated, editComment);
-// Delete a comment
 router.delete('/post/:postId/comments/:commentId/delete', isAuthenticated, deleteComment);
 
-// Also support POST for delete for compatibility
-router.post('/post/:id/delete', isAuthenticated, deletePost);
-
-// Plural alias routes for frontend compatibility
+// Plural alias routes for frontend
 router.post('/posts/:postId/reply', isAuthenticated, addReply);
 router.get('/posts/:postId/comments', getComments);
 router.post('/posts/:postId/comments/:commentId/like', isAuthenticated, likeComment);
 router.put('/posts/:postId/comments/:commentId/edit', isAuthenticated, editComment);
 router.delete('/posts/:postId/comments/:commentId/delete', isAuthenticated, deleteComment);
 
-// API: Get single post as JSON for React
+// API: Get single post as JSON
 router.get('/api/post/:id', async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
@@ -92,6 +88,7 @@ router.get('/api/post/:id', async (req, res) => {
     if (!post) return res.status(404).json({ error: 'Post not found' });
     res.json({ post });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
