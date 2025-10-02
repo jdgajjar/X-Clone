@@ -30,14 +30,86 @@ const {
   likeComment,
   editComment,
   deleteComment
-} = require('../controller/post.controller.js');
+} = require('../controller/post.controller.js'); // path must match exactly
 
 
 console.log('Post controller functions:', {
-  getSinglePost,
   getNewPost,
-  createPost
+  createPost,
+  getEditPost,
+  updatePost,
+  deletePost,
+  likePost,
+  bookmarkPost,
+  getSinglePost,
+  addReply,
+  getComments,
+  likeComment,
+  editComment,
+  deleteComment
 });
+
+const router = require('express').Router();
+const { isAuthenticated } = require('../middleware/auth');
+
+if (typeof getNewPost === 'function') {
+  router.get('/post/new', isAuthenticated, getNewPost);
+}
+
+if (typeof createPost === 'function') {
+  router.post('/api/post/new', isAuthenticated, uploadPost.single('image'), createPost);
+}
+
+if (typeof getEditPost === 'function') {
+  router.get('/post/:id/edit', isAuthenticated, getEditPost);
+}
+
+if (typeof updatePost === 'function') {
+  router.put('/api/post/:id/edit', isAuthenticated, uploadPost.single('image'), updatePost);
+}
+
+if (typeof deletePost === 'function') {
+  router.delete('/api/post/:id/delete', isAuthenticated, deletePost);
+  router.post('/post/:id/delete', isAuthenticated, deletePost); // compatibility
+}
+
+if (typeof likePost === 'function') {
+  router.post('/post/:id/like', isAuthenticated, likePost);
+}
+
+if (typeof bookmarkPost === 'function') {
+  router.post('/post/:id/bookmark', isAuthenticated, bookmarkPost);
+}
+
+if (typeof getSinglePost === 'function') {
+  router.get('/post/:id', getSinglePost);
+}
+
+if (typeof addReply === 'function') {
+  router.post('/post/:postId/reply', isAuthenticated, addReply);
+  router.post('/posts/:postId/reply', isAuthenticated, addReply); // plural alias
+}
+
+if (typeof getComments === 'function') {
+  router.get('/post/:postId/comments', getComments);
+  router.get('/posts/:postId/comments', getComments); // plural alias
+}
+
+if (typeof likeComment === 'function') {
+  router.post('/post/:postId/comments/:commentId/like', isAuthenticated, likeComment);
+  router.post('/posts/:postId/comments/:commentId/like', isAuthenticated, likeComment);
+}
+
+if (typeof editComment === 'function') {
+  router.put('/post/:postId/comments/:commentId/edit', isAuthenticated, editComment);
+  router.put('/posts/:postId/comments/:commentId/edit', isAuthenticated, editComment);
+}
+
+if (typeof deleteComment === 'function') {
+  router.delete('/post/:postId/comments/:commentId/delete', isAuthenticated, deleteComment);
+  router.delete('/posts/:postId/comments/:commentId/delete', isAuthenticated, deleteComment);
+}
+
 
 
 // ✅ Ensure all imported controller functions exist
