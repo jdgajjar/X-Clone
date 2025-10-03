@@ -160,10 +160,36 @@ const createPost = async (req, res) => {
               { quality: "auto" },
               { fetch_format: "auto" }
             ],
-            resource_type: "auto"
+            resource_type: "auto",
+            timeout: 60000 // 60 second timeout for Render.com
           };
           
-          const result = await cloudinary.uploader.upload(imageUrl, uploadOptions);
+          let result;
+          
+          // Try multiple upload approaches for Render.com reliability
+          try {
+            // Method 1: Direct file path upload
+            console.log('🔄 Attempting direct post image upload...');
+            result = await cloudinary.uploader.upload(imageUrl, uploadOptions);
+            console.log('✅ Direct post upload successful');
+          } catch (directError) {
+            console.log('⚠️ Direct post upload failed, trying buffer upload...', directError.message);
+            
+            // Method 2: Buffer upload (fallback for Render.com)
+            try {
+              const fileBuffer = require('fs').readFileSync(imageUrl);
+              // Detect MIME type from file
+              const mimeType = require('path').extname(imageUrl).toLowerCase() === '.png' ? 'image/png' : 'image/jpeg';
+              const base64Data = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+              
+              console.log('🔄 Attempting post buffer upload...');
+              result = await cloudinary.uploader.upload(base64Data, uploadOptions);
+              console.log('✅ Post buffer upload successful');
+            } catch (bufferError) {
+              console.error('❌ Both post upload methods failed:', bufferError.message);
+              throw bufferError;
+            }
+          }
           
           image = {
             url: result.secure_url,

@@ -792,11 +792,37 @@ const editProfilePage =  async (req, res) => {
               { quality: "auto" },
               { fetch_format: "auto" }
             ],
-            resource_type: "auto"
+            resource_type: "auto",
+            timeout: 60000 // 60 second timeout for Render.com
           };
           
           console.log('☁️ Uploading profile image to Cloudinary on Render.com...');
-          const result = await cloudinary.uploader.upload(imageFile.path, uploadOptions);
+          console.log('Upload options:', uploadOptions);
+          
+          let result;
+          
+          // Try multiple upload approaches for Render.com reliability
+          try {
+            // Method 1: Direct file path upload
+            console.log('🔄 Attempting direct file upload...');
+            result = await cloudinary.uploader.upload(imageFile.path, uploadOptions);
+            console.log('✅ Direct upload successful');
+          } catch (directError) {
+            console.log('⚠️ Direct upload failed, trying buffer upload...', directError.message);
+            
+            // Method 2: Buffer upload (fallback for Render.com)
+            try {
+              const fileBuffer = require('fs').readFileSync(imageFile.path);
+              const base64Data = `data:${imageFile.mimetype};base64,${fileBuffer.toString('base64')}`;
+              
+              console.log('🔄 Attempting buffer upload...');
+              result = await cloudinary.uploader.upload(base64Data, uploadOptions);
+              console.log('✅ Buffer upload successful');
+            } catch (bufferError) {
+              console.error('❌ Both upload methods failed:', bufferError.message);
+              throw bufferError;
+            }
+          }
           
           console.log('✅ Profile image uploaded successfully:', {
             url: result.secure_url,
@@ -857,11 +883,37 @@ const editProfilePage =  async (req, res) => {
               { quality: "auto" },
               { fetch_format: "auto" }
             ],
-            resource_type: "auto"
+            resource_type: "auto",
+            timeout: 60000 // 60 second timeout for Render.com
           };
           
           console.log('☁️ Uploading cover image to Cloudinary on Render.com...');
-          const result = await cloudinary.uploader.upload(coverFile.path, uploadOptions);
+          console.log('Upload options:', uploadOptions);
+          
+          let result;
+          
+          // Try multiple upload approaches for Render.com reliability
+          try {
+            // Method 1: Direct file path upload
+            console.log('🔄 Attempting direct cover upload...');
+            result = await cloudinary.uploader.upload(coverFile.path, uploadOptions);
+            console.log('✅ Direct cover upload successful');
+          } catch (directError) {
+            console.log('⚠️ Direct cover upload failed, trying buffer upload...', directError.message);
+            
+            // Method 2: Buffer upload (fallback for Render.com)
+            try {
+              const fileBuffer = require('fs').readFileSync(coverFile.path);
+              const base64Data = `data:${coverFile.mimetype};base64,${fileBuffer.toString('base64')}`;
+              
+              console.log('🔄 Attempting cover buffer upload...');
+              result = await cloudinary.uploader.upload(base64Data, uploadOptions);
+              console.log('✅ Cover buffer upload successful');
+            } catch (bufferError) {
+              console.error('❌ Both cover upload methods failed:', bufferError.message);
+              throw bufferError;
+            }
+          }
           
           console.log('✅ Cover image uploaded successfully:', {
             url: result.secure_url,

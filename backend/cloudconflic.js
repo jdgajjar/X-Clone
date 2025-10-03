@@ -2,7 +2,7 @@ const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 // Enhanced Cloudinary configuration for Render.com deployment
-cloudinary.config({
+const cloudinaryConfig = {
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.CLOUD_API_KEY,
   api_secret: process.env.CLOUD_API_SECRET,
@@ -10,23 +10,33 @@ cloudinary.config({
   use_filename: true,
   unique_filename: false,
   overwrite: true,
-});
+};
+
+// Only configure Cloudinary if all required variables are present
+if (process.env.CLOUD_NAME && process.env.CLOUD_API_KEY && process.env.CLOUD_API_SECRET) {
+  cloudinary.config(cloudinaryConfig);
+} else {
+  console.error('❌ CRITICAL: Cloudinary not configured - missing environment variables');
+}
 
 // Verify Cloudinary configuration with detailed logging for Render.com
-console.log('Cloudinary Environment Check:');
-console.log('CLOUD_NAME:', process.env.CLOUD_NAME ? 'SET' : 'MISSING');
-console.log('CLOUD_API_KEY:', process.env.CLOUD_API_KEY ? 'SET' : 'MISSING');
-console.log('CLOUD_API_SECRET:', process.env.CLOUD_API_SECRET ? 'SET' : 'MISSING');
+console.log('🔧 Cloudinary Environment Check:');
+console.log('CLOUD_NAME:', process.env.CLOUD_NAME ? `SET (${process.env.CLOUD_NAME})` : '❌ MISSING');
+console.log('CLOUD_API_KEY:', process.env.CLOUD_API_KEY ? `SET (${process.env.CLOUD_API_KEY.substring(0, 6)}...)` : '❌ MISSING');
+console.log('CLOUD_API_SECRET:', process.env.CLOUD_API_SECRET ? 'SET (hidden)' : '❌ MISSING');
 
 if (!process.env.CLOUD_NAME || !process.env.CLOUD_API_KEY || !process.env.CLOUD_API_SECRET) {
   console.error('❌ CRITICAL: Missing Cloudinary configuration for Render.com deployment');
-  console.log('Required environment variables:');
-  console.log('- CLOUD_NAME (currently:', process.env.CLOUD_NAME || 'NOT SET', ')');
-  console.log('- CLOUD_API_KEY (currently:', process.env.CLOUD_API_KEY || 'NOT SET', ')');
-  console.log('- CLOUD_API_SECRET (currently:', process.env.CLOUD_API_SECRET ? 'SET' : 'NOT SET', ')');
-  console.log('Please set these in your Render.com environment variables');
+  console.log('📋 Required environment variables in Render.com dashboard:');
+  console.log('   - CLOUD_NAME = dkqd9ects');
+  console.log('   - CLOUD_API_KEY = 819237941854538');
+  console.log('   - CLOUD_API_SECRET = ifyGR1x0Y4qu4W8TNa5hh82rLZc');
+  console.log('💡 Go to Render.com → Your Service → Environment → Add these variables');
 } else {
   console.log('✅ Cloudinary configuration loaded successfully for Render.com');
+  console.log('   📁 Cloud Name:', process.env.CLOUD_NAME);
+  console.log('   🔑 API Key configured');
+  console.log('   🔐 API Secret configured');
 }
 
 // Storage for posts - optimized for Render.com
@@ -132,14 +142,67 @@ const validateImageFile = (file) => {
   return true;
 };
 
-// Helper function to test Cloudinary connection
+// Helper function to test Cloudinary connection for Render.com with improved error handling
 const testCloudinaryConnection = async () => {
   try {
-    const result = await cloudinary.api.ping();
-    console.log('✅ Cloudinary connection test successful:', result);
-    return true;
+    console.log('🔍 Testing Cloudinary connection with configuration:', {
+      cloud_name: process.env.CLOUD_NAME || 'NOT SET',
+      api_key: process.env.CLOUD_API_KEY ? `${process.env.CLOUD_API_KEY.substring(0, 6)}...` : 'NOT SET',
+      api_secret: process.env.CLOUD_API_SECRET ? 'SET (hidden)' : 'NOT SET'
+    });
+
+    // First check if all required config is present
+    if (!process.env.CLOUD_NAME || !process.env.CLOUD_API_KEY || !process.env.CLOUD_API_SECRET) {
+      console.error('❌ Missing Cloudinary environment variables for Render.com');
+      console.log('💡 Please set these environment variables in Render.com dashboard:');
+      console.log('   CLOUD_NAME = dkqd9ects');
+      console.log('   CLOUD_API_KEY = 819237941854538');
+      console.log('   CLOUD_API_SECRET = ifyGR1x0Y4qu4W8TNa5hh82rLZc');
+      return false;
+    }
+
+    // Test the configuration by making a small API call
+    console.log('🔌 Testing Cloudinary API connection...');
+    
+    // Use a simpler API call that's more likely to succeed
+    const pingResult = await cloudinary.api.ping();
+    
+    if (pingResult && pingResult.status === 'ok') {
+      console.log('✅ Cloudinary connection test successful on Render.com');
+      console.log('   - API Status: OK');
+      console.log('   - Ready for image uploads');
+      return true;
+    } else {
+      console.log('⚠️ Cloudinary ping succeeded but status unclear:', pingResult);
+      return false;
+    }
   } catch (error) {
-    console.error('❌ Cloudinary connection test failed:', error.message);
+    console.error('❌ Cloudinary connection test failed on Render.com:', error?.message || 'Unknown error');
+    
+    // More specific error handling for Render.com deployment
+    if (error?.http_code) {
+      console.error(`   - HTTP Error ${error.http_code}:`, error.message);
+      if (error.http_code === 401) {
+        console.error('   ⚠️ Authentication failed - Check CLOUD_API_KEY and CLOUD_API_SECRET');
+      } else if (error.http_code === 400) {
+        console.error('   ⚠️ Bad request - Check CLOUD_NAME');
+      } else if (error.http_code === 403) {
+        console.error('   ⚠️ Forbidden - Check account permissions and quotas');
+      }
+    } else if (error?.code) {
+      console.error(`   - Network Error ${error.code}:`, error.message);
+      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+        console.error('   ⚠️ Cannot reach Cloudinary servers - Check network connectivity');
+      }
+    } else {
+      console.error('   - Unknown error type:', error);
+    }
+    
+    console.log('💡 Troubleshooting tips for Render.com:');
+    console.log('   1. Verify environment variables are set correctly');
+    console.log('   2. Check Cloudinary account status and quotas');
+    console.log('   3. Ensure API credentials are active');
+    
     return false;
   }
 };
