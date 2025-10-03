@@ -16,6 +16,7 @@ const {
   getProfileStorage,
   cleanupTempFile,
   validateImageFile,
+  testCloudinaryConnection,
 } = require("./cloudconflic");
 const multer = require("multer");
 const os = require("os");
@@ -438,8 +439,17 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Health check available at: http://localhost:${PORT}/health`);
-  console.log(`API status available at: http://localhost:${PORT}/api/status`);
+server.listen(PORT, async () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`📍 Health check: http://localhost:${PORT}/health`);
+  console.log(`📊 API status: http://localhost:${PORT}/api/status`);
+  
+  // Test Cloudinary connection for Render.com image uploads
+  console.log('\n🔍 Testing Cloudinary connection for image uploads...');
+  const cloudinaryOk = await testCloudinaryConnection();
+  if (cloudinaryOk) {
+    console.log('✅ Image uploads should work correctly on Render.com');
+  } else {
+    console.log('❌ Image uploads may fail - check Cloudinary environment variables');
+  }
 });

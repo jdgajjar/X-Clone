@@ -122,11 +122,9 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 // Passport removed - using session-based authentication only
 // Google OAuth removed - using session-based authentication only
-const { cloudinary, poststorage, profileImageStorage, profileCoverStorage, getProfileStorage } = require('../cloudconflic');
+// Note: cloudinary is already imported at the top of the file
 const multer = require('multer');
 const os = require('os');
-const fs = require('fs');
-const uploadPost = multer({ storage: poststorage });
 const uploadProfile = multer({
     storage: multer.diskStorage({
         destination: function (req, file, cb) {
@@ -139,9 +137,7 @@ const uploadProfile = multer({
     fileFilter: (req, file, cb) => cb(null, true)
 });
 const methodOverride = require('method-override');
-// FIX: Correct import path for User and Post models
-const User = require('../models/User');
-const Post = require('../models/Post');
+// Note: User and Post models are already imported at the top of the file
 
 // Store reset tokens temporarily (in production, use Redis or a database)
 const resetTokens = new Map();
@@ -748,6 +744,13 @@ const editProfilePage =  async (req, res) => {
         try {
           const imageFile = req.files.Image[0];
           
+          console.log('🖼️ Processing profile image upload on Render.com:', {
+            filename: imageFile.filename,
+            originalname: imageFile.originalname,
+            mimetype: imageFile.mimetype,
+            size: Math.round(imageFile.size / 1024) + 'KB'
+          });
+          
           // Validate image file
           const { validateImageFile } = require('../cloudconflic');
           validateImageFile(imageFile);
@@ -774,7 +777,13 @@ const editProfilePage =  async (req, res) => {
             resource_type: "auto"
           };
           
+          console.log('☁️ Uploading profile image to Cloudinary...');
           const result = await cloudinary.uploader.upload(imageFile.path, uploadOptions);
+          
+          console.log('✅ Profile image uploaded successfully:', {
+            url: result.secure_url,
+            public_id: result.public_id
+          });
           
           user.profilePhoto = {
             url: result.secure_url,
@@ -798,6 +807,13 @@ const editProfilePage =  async (req, res) => {
       if (req.files && req.files.cover && req.files.cover[0]) {
         try {
           const coverFile = req.files.cover[0];
+          
+          console.log('🖼️ Processing cover image upload on Render.com:', {
+            filename: coverFile.filename,
+            originalname: coverFile.originalname,
+            mimetype: coverFile.mimetype,
+            size: Math.round(coverFile.size / 1024) + 'KB'
+          });
           
           // Validate image file
           const { validateImageFile } = require('../cloudconflic');
