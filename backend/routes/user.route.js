@@ -105,27 +105,38 @@ router.get('/profile/:username/followers', isAuthenticated, getFollowers);
 router.post('/profile/:username/follow', isAuthenticated, followUser);
 router.post('/profile/:username/unfollow', isAuthenticated, unfollowUser);
 router.get('/profile/:id/edit', isAuthenticated, uploadProfileImage.single('Image'), editProfilePage);
-// Accept both profile and cover image uploads - Render.com optimized
+// Enhanced profile upload configuration for Render.com with detailed logging
 const uploadProfile = multer({
   storage: multer.diskStorage({
     destination: function (req, file, cb) {
       // Use system temp directory which is more reliable on Render.com
       const tempDir = os.tmpdir();
+      console.log('Profile upload - Using temp directory on Render.com:', tempDir);
       cb(null, tempDir);
     },
     filename: function (req, file, cb) {
       // Generate unique filename to avoid conflicts
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, file.fieldname + '-' + uniqueSuffix + '-' + file.originalname);
+      const filename = file.fieldname + '-' + uniqueSuffix + '-' + file.originalname;
+      console.log('Profile upload - Generated filename on Render.com:', filename);
+      cb(null, filename);
     }
   }),
   fileFilter: (req, file, cb) => {
+    console.log('Profile upload - File filter check on Render.com:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype
+    });
+    
     // Enhanced file validation for Render.com
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (allowedTypes.includes(file.mimetype)) {
+      console.log('✅ Profile file type accepted:', file.mimetype);
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'));
+      console.error('❌ Profile file type rejected:', file.mimetype);
+      cb(new Error(`Invalid file type: ${file.mimetype}. Only JPEG, PNG, GIF, and WebP are allowed.`));
     }
   },
   limits: {

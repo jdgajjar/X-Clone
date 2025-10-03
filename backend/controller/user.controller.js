@@ -122,11 +122,10 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 // Passport removed - using session-based authentication only
 // Google OAuth removed - using session-based authentication only
-const { cloudinary, poststorage, profileImageStorage, profileCoverStorage, getProfileStorage } = require('../cloudconflic');
+// Note: cloudinary is already imported at the top of the file
 const multer = require('multer');
 const os = require('os');
-const fs = require('fs');
-const uploadPost = multer({ storage: poststorage });
+// Note: poststorage not available here since we removed the import, but it's not used in this file
 const uploadProfile = multer({
     storage: multer.diskStorage({
         destination: function (req, file, cb) {
@@ -139,9 +138,7 @@ const uploadProfile = multer({
     fileFilter: (req, file, cb) => cb(null, true)
 });
 const methodOverride = require('method-override');
-// FIX: Correct import path for User and Post models
-const User = require('../models/User');
-const Post = require('../models/Post');
+// Note: User and Post models are already imported at the top of the file
 
 // Store reset tokens temporarily (in production, use Redis or a database)
 const resetTokens = new Map();
@@ -727,26 +724,50 @@ const editProfilePage =  async (req, res) => {
 
   const updateProfile = async (req, res) => {
     try {
+      console.log('🔄 Profile update request on Render.com:', {
+        body: req.body,
+        files: req.files ? Object.keys(req.files) : 'No files',
+        userId: req.user ? req.user._id : req.session.userId
+      });
+
       const { username, email } = req.body;
       const userId = req.user ? req.user._id : req.session.userId;
       
       if (!userId) {
+        console.error('❌ Profile update failed: Not authenticated');
         return res.status(401).json({ success: false, error: "Not authenticated" });
       }
       
       let user = await User.findById(userId);
       if (!user) {
+        console.error('❌ Profile update failed: User not found:', userId);
         return res.status(404).json({ success: false, error: "User not found" });
       }
       
+      console.log('✅ User found for profile update:', user.username);
+      
       // Update basic fields
-      if (username) user.username = username.trim();
-      if (email) user.email = email.trim();
+      if (username) {
+        console.log('Updating username:', username.trim());
+        user.username = username.trim();
+      }
+      if (email) {
+        console.log('Updating email:', email.trim());
+        user.email = email.trim();
+      }
       
       // Handle profile image upload (Render.com optimized)
       if (req.files && req.files.Image && req.files.Image[0]) {
         try {
           const imageFile = req.files.Image[0];
+          
+          console.log('🖼️ Processing profile image on Render.com:', {
+            filename: imageFile.filename,
+            originalname: imageFile.originalname,
+            mimetype: imageFile.mimetype,
+            size: imageFile.size,
+            path: imageFile.path
+          });
           
           // Validate image file
           const { validateImageFile } = require('../cloudconflic');
@@ -757,9 +778,9 @@ const editProfilePage =  async (req, res) => {
               !user.profilePhoto.filename.includes("profile_offakc")) {
             try {
               await cloudinary.uploader.destroy(user.profilePhoto.filename);
-              console.log("Previous profile image deleted:", user.profilePhoto.filename);
+              console.log("✅ Previous profile image deleted:", user.profilePhoto.filename);
             } catch (err) {
-              console.log("Error deleting previous profile photo (non-critical):", err.message);
+              console.log("⚠️ Error deleting previous profile photo (non-critical):", err.message);
             }
           }
           
@@ -774,7 +795,13 @@ const editProfilePage =  async (req, res) => {
             resource_type: "auto"
           };
           
+          console.log('☁️ Uploading profile image to Cloudinary on Render.com...');
           const result = await cloudinary.uploader.upload(imageFile.path, uploadOptions);
+          
+          console.log('✅ Profile image uploaded successfully:', {
+            url: result.secure_url,
+            public_id: result.public_id
+          });
           
           user.profilePhoto = {
             url: result.secure_url,
@@ -786,7 +813,8 @@ const editProfilePage =  async (req, res) => {
           cleanupTempFile(imageFile.path);
           
         } catch (imageError) {
-          console.error("Profile image upload error:", imageError);
+          console.error("❌ Profile image upload error on Render.com:", imageError);
+          console.error("Error stack:", imageError.stack);
           return res.status(400).json({ 
             success: false, 
             error: imageError.message || "Profile image upload failed" 
@@ -799,6 +827,14 @@ const editProfilePage =  async (req, res) => {
         try {
           const coverFile = req.files.cover[0];
           
+          console.log('🖼️ Processing cover image on Render.com:', {
+            filename: coverFile.filename,
+            originalname: coverFile.originalname,
+            mimetype: coverFile.mimetype,
+            size: coverFile.size,
+            path: coverFile.path
+          });
+          
           // Validate image file
           const { validateImageFile } = require('../cloudconflic');
           validateImageFile(coverFile);
@@ -807,9 +843,9 @@ const editProfilePage =  async (req, res) => {
           if (user.coverPhoto && user.coverPhoto.filename) {
             try {
               await cloudinary.uploader.destroy(user.coverPhoto.filename);
-              console.log("Previous cover image deleted:", user.coverPhoto.filename);
+              console.log("✅ Previous cover image deleted:", user.coverPhoto.filename);
             } catch (err) {
-              console.log("Error deleting previous cover photo (non-critical):", err.message);
+              console.log("⚠️ Error deleting previous cover photo (non-critical):", err.message);
             }
           }
           
@@ -824,7 +860,13 @@ const editProfilePage =  async (req, res) => {
             resource_type: "auto"
           };
           
+          console.log('☁️ Uploading cover image to Cloudinary on Render.com...');
           const result = await cloudinary.uploader.upload(coverFile.path, uploadOptions);
+          
+          console.log('✅ Cover image uploaded successfully:', {
+            url: result.secure_url,
+            public_id: result.public_id
+          });
           
           user.coverPhoto = {
             url: result.secure_url,
@@ -836,7 +878,8 @@ const editProfilePage =  async (req, res) => {
           cleanupTempFile(coverFile.path);
           
         } catch (coverError) {
-          console.error("Cover image upload error:", coverError);
+          console.error("❌ Cover image upload error on Render.com:", coverError);
+          console.error("Error stack:", coverError.stack);
           return res.status(400).json({ 
             success: false, 
             error: coverError.message || "Cover image upload failed" 
@@ -845,13 +888,21 @@ const editProfilePage =  async (req, res) => {
       }
       
       // Save user with updated data
+      console.log('💾 Saving profile updates to database on Render.com...');
       await user.save();
-      console.log("Profile updated successfully for user:", user.username);
+      console.log("✅ Profile updated successfully for user:", user.username);
       
       // Return updated user data
       const updatedUser = await User.findById(userId)
         .select('_id username email profilePhoto coverPhoto IsVerified')
         .lean();
+      
+      console.log('🎉 Profile update completed on Render.com:', {
+        userId: updatedUser._id,
+        username: updatedUser.username,
+        hasProfilePhoto: !!updatedUser.profilePhoto?.url,
+        hasCoverPhoto: !!updatedUser.coverPhoto?.url
+      });
       
       return res.json({ success: true, user: updatedUser });
       

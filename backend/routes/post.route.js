@@ -23,16 +23,24 @@ const {
 } = require('../controller/post.controller.js');
 
 const router = Router();
-// Enhanced multer configuration for Render.com post uploads
+// Enhanced multer configuration for Render.com post uploads with detailed logging
 const uploadPost = multer({
   storage: poststorage,
   fileFilter: (req, file, cb) => {
+    console.log('Post upload - File filter check on Render.com:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype
+    });
+    
     // Enhanced file validation for Render.com
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (allowedTypes.includes(file.mimetype)) {
+      console.log('✅ Post file type accepted:', file.mimetype);
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'));
+      console.error('❌ Post file type rejected:', file.mimetype);
+      cb(new Error(`Invalid file type: ${file.mimetype}. Only JPEG, PNG, GIF, and WebP are allowed.`));
     }
   },
   limits: {

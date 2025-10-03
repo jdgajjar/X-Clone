@@ -12,10 +12,21 @@ cloudinary.config({
   overwrite: true,
 });
 
-// Verify Cloudinary configuration
+// Verify Cloudinary configuration with detailed logging for Render.com
+console.log('Cloudinary Environment Check:');
+console.log('CLOUD_NAME:', process.env.CLOUD_NAME ? 'SET' : 'MISSING');
+console.log('CLOUD_API_KEY:', process.env.CLOUD_API_KEY ? 'SET' : 'MISSING');
+console.log('CLOUD_API_SECRET:', process.env.CLOUD_API_SECRET ? 'SET' : 'MISSING');
+
 if (!process.env.CLOUD_NAME || !process.env.CLOUD_API_KEY || !process.env.CLOUD_API_SECRET) {
-  console.error('Missing Cloudinary configuration. Please check environment variables.');
-  console.log('Required: CLOUD_NAME, CLOUD_API_KEY, CLOUD_API_SECRET');
+  console.error('❌ CRITICAL: Missing Cloudinary configuration for Render.com deployment');
+  console.log('Required environment variables:');
+  console.log('- CLOUD_NAME (currently:', process.env.CLOUD_NAME || 'NOT SET', ')');
+  console.log('- CLOUD_API_KEY (currently:', process.env.CLOUD_API_KEY || 'NOT SET', ')');
+  console.log('- CLOUD_API_SECRET (currently:', process.env.CLOUD_API_SECRET ? 'SET' : 'NOT SET', ')');
+  console.log('Please set these in your Render.com environment variables');
+} else {
+  console.log('✅ Cloudinary configuration loaded successfully for Render.com');
 }
 
 // Storage for posts - optimized for Render.com
@@ -87,20 +98,50 @@ const cleanupTempFile = (filePath) => {
   }
 };
 
-// Helper function to validate image file
+// Enhanced helper function to validate image file for Render.com
 const validateImageFile = (file) => {
+  console.log('Validating file for Render.com:', {
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size,
+    fieldname: file.fieldname
+  });
+
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
   const maxSize = 5 * 1024 * 1024; // 5MB
   
+  if (!file) {
+    throw new Error('No file provided');
+  }
+  
+  if (!file.mimetype) {
+    throw new Error('File mimetype is missing');
+  }
+  
   if (!allowedTypes.includes(file.mimetype)) {
-    throw new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.');
+    console.error('Invalid file type on Render.com:', file.mimetype);
+    throw new Error(`Invalid file type: ${file.mimetype}. Only JPEG, PNG, GIF, and WebP are allowed.`);
   }
   
   if (file.size > maxSize) {
-    throw new Error('File too large. Maximum size is 5MB.');
+    console.error('File too large on Render.com:', file.size, 'bytes');
+    throw new Error(`File too large: ${Math.round(file.size / 1024 / 1024 * 100) / 100}MB. Maximum size is 5MB.`);
   }
   
+  console.log('✅ File validation passed for Render.com');
   return true;
+};
+
+// Helper function to test Cloudinary connection
+const testCloudinaryConnection = async () => {
+  try {
+    const result = await cloudinary.api.ping();
+    console.log('✅ Cloudinary connection test successful:', result);
+    return true;
+  } catch (error) {
+    console.error('❌ Cloudinary connection test failed:', error.message);
+    return false;
+  }
 };
 
 module.exports = {
@@ -111,4 +152,5 @@ module.exports = {
   getProfileStorage,
   cleanupTempFile,
   validateImageFile,
+  testCloudinaryConnection,
 };

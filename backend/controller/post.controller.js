@@ -80,29 +80,8 @@ const path = require("path");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
-const {
-  cloudinary,
-  poststorage,
-  profileImageStorage,
-  profileCoverStorage,
-  getProfileStorage,
-} = require("../cloudconflic");
-const multer = require("multer");
-const os = require("os");
-const fs = require("fs");
-
-const uploadPost = multer({ storage: poststorage });
-const uploadProfile = multer({
-  storage: multer.diskStorage({
-    destination: function (req, file, cb) {
-      cb(null, os.tmpdir()); // Use OS temp directory
-    },
-    filename: function (req, file, cb) {
-      cb(null, Date.now() + "-" + file.originalname);
-    },
-  }),
-  fileFilter: (req, file, cb) => cb(null, true),
-});
+// Note: cloudinary is already imported at the top, removing duplicate imports
+// These multer configurations are defined in the route files, not needed here
 
 const methodOverride = require("method-override");
 
@@ -118,16 +97,19 @@ const createPost = async (req, res) => {
     let { content } = req.body;
     let userId = req.user ? req.user._id : req.session.userId;
 
-    // Debug: log incoming data for Render.com troubleshooting
-    console.log('CREATE POST DEBUG (Render.com):', {
+    // Enhanced logging for Render.com troubleshooting
+    console.log('📝 CREATE POST REQUEST on Render.com:', {
       body: req.body,
       file: req.file ? { 
+        fieldname: req.file.fieldname,
         filename: req.file.filename, 
+        originalname: req.file.originalname,
         path: req.file.path,
         mimetype: req.file.mimetype,
         size: req.file.size 
-      } : null,
-      userId
+      } : 'No file uploaded',
+      userId,
+      contentLength: content?.length || 0
     });
 
     if (!userId) {
@@ -142,6 +124,15 @@ const createPost = async (req, res) => {
     let image = undefined;
     if (req.file) {
       try {
+        console.log('🖼️ Processing post image on Render.com:', {
+          fieldname: req.file.fieldname,
+          filename: req.file.filename,
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          path: req.file.path
+        });
+
         // Validate image file
         const { validateImageFile } = require('../cloudconflic');
         validateImageFile(req.file);
@@ -157,9 +148,11 @@ const createPost = async (req, res) => {
             url: imageUrl,
             filename: imageFilename,
           };
-          console.log("Post image uploaded to Cloudinary:", imageUrl);
+          console.log("✅ Post image uploaded to Cloudinary via multer-storage-cloudinary:", imageUrl);
         } else {
           // Fallback: manual Cloudinary upload for Render.com compatibility
+          console.log('☁️ Performing manual Cloudinary upload on Render.com...');
+          
           const uploadOptions = {
             folder: "posts",
             transformation: [
@@ -181,13 +174,17 @@ const createPost = async (req, res) => {
           const { cleanupTempFile } = require('../cloudconflic');
           cleanupTempFile(imageUrl);
           
-          console.log("Post image manually uploaded to Cloudinary:", result.secure_url);
+          console.log("✅ Post image manually uploaded to Cloudinary:", {
+            url: result.secure_url,
+            public_id: result.public_id
+          });
         }
       } catch (imageError) {
-        console.error("Post image upload error:", imageError);
+        console.error("❌ Post image upload error on Render.com:", imageError);
+        console.error("Error stack:", imageError.stack);
         return res.status(400).json({ 
           success: false, 
-          error: imageError.message || "Image upload failed" 
+          error: imageError.message || "Image upload failed on Render.com" 
         });
       }
     }
