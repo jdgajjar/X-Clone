@@ -8,7 +8,7 @@ const PostPartial = ({ post, currentUser, onEdit, onDelete, onLike, onReply, onS
   <article className="border-b border-gray-800 p-4 post-hover cursor-pointer">
     <div className="flex">
       <div className="flex-shrink-0 mr-3">
-        <img
+        
           <img
   src={
     user?.profileImg?.startsWith("http")
