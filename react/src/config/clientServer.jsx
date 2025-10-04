@@ -32,12 +32,21 @@ const clientServer = axios.create({
   }
 });
 
-// Request interceptor to add authentication header
+// Request interceptor to add authentication header and handle FormData
 clientServer.interceptors.request.use((config) => {
   const token = localStorage.getItem("token"); // ✅ consistent key
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // If sending FormData, remove Content-Type header to let axios set it automatically
+  if (config.data instanceof FormData) {
+    console.log('📤 Sending FormData request to:', config.url);
+    delete config.headers['Content-Type'];
+    // Ensure withCredentials is true for file uploads
+    config.withCredentials = true;
+  }
+  
   return config;
 });
 

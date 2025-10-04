@@ -42,15 +42,25 @@ if (!process.env.CLOUD_NAME || !process.env.CLOUD_API_KEY || !process.env.CLOUD_
 // Storage for posts - optimized for Render.com
 const poststorage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: "posts",
-    allowed_formats: ["jpg", "png", "jpeg", "gif", "webp"],
-    resource_type: "auto",
-    transformation: [
-      { width: 1200, height: 1200, crop: "limit" },
-      { quality: "auto" },
-      { fetch_format: "auto" }
-    ]
+  params: async (req, file) => {
+    console.log('🔧 CloudinaryStorage params for post:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
+    return {
+      folder: "posts",
+      allowed_formats: ["jpg", "png", "jpeg", "gif", "webp"],
+      resource_type: "auto",
+      public_id: `post_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      transformation: [
+        { width: 1200, height: 1200, crop: "limit" },
+        { quality: "auto" },
+        { fetch_format: "auto" }
+      ]
+    };
   },
 });
 

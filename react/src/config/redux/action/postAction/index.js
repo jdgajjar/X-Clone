@@ -19,7 +19,11 @@ export const editPostThunk = createAsyncThunk(
     try {
       const res = await clientServer.put(`/api/post/${id}/edit`, formData, {
         withCredentials: true,
-        headers: { 'Accept': 'application/json' },
+        headers: { 
+          'Accept': 'application/json',
+          // Remove Content-Type to let axios set it automatically for FormData
+          'Content-Type': undefined
+        },
       });
       console.log('[editPostThunk] Response:', res.data);
       // Return the updated post object
