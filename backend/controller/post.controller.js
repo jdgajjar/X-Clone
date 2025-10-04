@@ -108,19 +108,29 @@ const createPost = async (req, res) => {
         mimetype: req.file.mimetype,
         size: req.file.size 
       } : 'No file uploaded',
+      hasFile: !!req.file,
+      files: req.files,
       userId,
-      contentLength: content?.length || 0
+      contentLength: content?.length || 0,
+      headers: {
+        'content-type': req.headers['content-type'],
+        'content-length': req.headers['content-length']
+      }
     });
 
     // Validate authentication
     if (!userId) {
+      console.error('❌ No user ID found in request');
       return res.status(401).json({ success: false, error: "Authentication required" });
     }
 
     // Validate content
     if (!content || content.trim() === '') {
+      console.error('❌ No content provided in post request');
       return res.status(400).json({ success: false, error: "Post content is required" });
     }
+
+    console.log('✅ Basic validation passed - proceeding with post creation');
 
     // Handle image upload with improved error handling
     let image = undefined;

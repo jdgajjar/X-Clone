@@ -49,7 +49,9 @@ const uploadPost = multer({
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
     files: 1, // Max 1 file per post
-    fieldSize: 10 * 1024 * 1024 // 10MB field size limit
+    fieldSize: 10 * 1024 * 1024, // 10MB field size limit
+    fieldNameSize: 100, // fieldname size limit
+    fields: 10 // Max number of non-file fields
   },
   onError: (err, next) => {
     console.error('❌ Multer error in post upload:', err);
@@ -65,6 +67,15 @@ if (typeof getNewPost === 'function') {
 
 if (typeof createPost === 'function') {
   router.post('/api/post/new', isAuthenticated, (req, res, next) => {
+    console.log('📝 POST /api/post/new - Before multer:', {
+      contentType: req.headers['content-type'],
+      hasBody: !!req.body,
+      bodyType: typeof req.body,
+      bodyKeys: Object.keys(req.body || {}),
+      hasFile: !!req.file,
+      hasFiles: !!req.files
+    });
+    
     uploadPost.single('image')(req, res, (err) => {
       if (err) {
         console.error('❌ Multer error in createPost:', err);
@@ -85,6 +96,19 @@ if (typeof createPost === 'function') {
           });
         }
       }
+      
+      console.log('✅ Multer processing complete:', {
+        hasFile: !!req.file,
+        hasFiles: !!req.files,
+        body: req.body,
+        fileInfo: req.file ? {
+          fieldname: req.file.fieldname,
+          originalname: req.file.originalname,
+          size: req.file.size,
+          mimetype: req.file.mimetype
+        } : null
+      });
+      
       next();
     });
   }, createPost);
@@ -96,6 +120,15 @@ if (typeof getEditPost === 'function') {
 
 if (typeof updatePost === 'function') {
   router.put('/api/post/:id/edit', isAuthenticated, (req, res, next) => {
+    console.log('🔄 PUT /api/post/:id/edit - Before multer:', {
+      contentType: req.headers['content-type'],
+      hasBody: !!req.body,
+      bodyType: typeof req.body,
+      bodyKeys: Object.keys(req.body || {}),
+      hasFile: !!req.file,
+      hasFiles: !!req.files
+    });
+    
     uploadPost.single('image')(req, res, (err) => {
       if (err) {
         console.error('❌ Multer error in updatePost:', err);
@@ -116,6 +149,19 @@ if (typeof updatePost === 'function') {
           });
         }
       }
+      
+      console.log('✅ Multer processing complete for update:', {
+        hasFile: !!req.file,
+        hasFiles: !!req.files,
+        body: req.body,
+        fileInfo: req.file ? {
+          fieldname: req.file.fieldname,
+          originalname: req.file.originalname,
+          size: req.file.size,
+          mimetype: req.file.mimetype
+        } : null
+      });
+      
       next();
     });
   }, updatePost);

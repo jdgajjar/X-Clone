@@ -397,7 +397,12 @@ function AppRoutes() {
     if (form.profilePhoto) formData.append('Image', form.profilePhoto);
     if (form.coverPhoto) formData.append('cover', form.coverPhoto);
     try {
-      const data = await clientServer.post('/profile/edit', formData, { headers: { 'Accept': 'application/json' } });
+      const data = await clientServer.post('/profile/edit', formData, { 
+        headers: { 
+          'Accept': 'application/json',
+          'Content-Type': undefined // Let axios set this for FormData
+        } 
+      });
       if (data && data.user && data.user.username) {
         setUser(data.user); // update user state
         navigate(`/profile/${data.user.username}`);
@@ -507,14 +512,23 @@ function AppRoutes() {
               formData.append('content', content);
               if (image) formData.append('image', image);
               try {
-                const data = await clientServer.post('/api/post/new', formData, { headers: { 'Accept': 'application/json' } });
-                if (data && data.post && data.post._id) {
-                  navigate(`/post/${data.post._id}`);
+                console.log('🚀 Submitting new post:', { content, hasImage: !!image, imageType: image?.type, imageSize: image?.size });
+                const data = await clientServer.post('/api/post/new', formData, { 
+                  headers: { 
+                    'Accept': 'application/json',
+                    // Remove Content-Type to let axios set it automatically for FormData
+                    'Content-Type': undefined
+                  } 
+                });
+                console.log('✅ Post creation response:', data);
+                if (data && data.data && data.data.post && data.data.post._id) {
+                  navigate(`/post/${data.data.post._id}`);
                   return;
                 }
                 // fallback: go home
                 navigate('/');
               } catch (err) {
+                console.error('❌ Post creation error:', err);
                 navigate('/');
               }
             }}
