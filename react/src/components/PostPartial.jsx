@@ -9,10 +9,9 @@ const PostPartial = ({ post, currentUser, onEdit, onDelete, onLike, onReply, onS
     <div className="flex">
       <div className="flex-shrink-0 mr-3">
         
-          <img
-  src={
-    user?.profileImg?.startsWith("http")
-      ? user.profileImg
+          <img src={
+    author?.profileImg?.startsWith("http")
+      ? author.profileImg
       : "/images/default_profile.png"
   }
   alt="profile"
