@@ -9,13 +9,17 @@ const PostPartial = ({ post, currentUser, onEdit, onDelete, onLike, onReply, onS
     <div className="flex">
       <div className="flex-shrink-0 mr-3">
         
-          <img src={
-    post.author?.profileImg?.startsWith("http")
-      ? post.author.profileImg
-      : "/images/default_profile.png"
+        <img
+  src={
+    post.author?.profilePhoto && post.author.profilePhoto.startsWith("http")
+      ? post.author.profilePhoto
+      : "https://res.cloudinary.com/dkqd9ects/image/upload/v1747571510/profile_offakc.png"
   }
-  alt="profile"
+  alt={post.author?.name || "User"}
+  className="w-10 h-10 rounded-full object-cover bg-gray-800 border-2 border-gray-700 block align-middle"
+  style={{ boxSizing: "border-box", margin: 0, padding: 0 }}
 />
+
 
           alt={post.author?.name || 'User'}
           className="w-10 h-10 rounded-full object-cover bg-gray-800 border-2 border-gray-700 block align-middle"
