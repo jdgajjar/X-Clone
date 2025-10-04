@@ -23,29 +23,37 @@ const {
 } = require('../controller/post.controller.js');
 
 const router = Router();
-// Enhanced multer configuration for Render.com post uploads with detailed logging
+// Enhanced multer configuration for post uploads with improved error handling
 const uploadPost = multer({
   storage: poststorage,
   fileFilter: (req, file, cb) => {
-    console.log('Post upload - File filter check on Render.com:', {
+    console.log('📁 Post upload - File filter check:', {
       fieldname: file.fieldname,
       originalname: file.originalname,
-      mimetype: file.mimetype
+      mimetype: file.mimetype,
+      size: file.size
     });
     
-    // Enhanced file validation for Render.com
+    // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (allowedTypes.includes(file.mimetype)) {
+    if (file.mimetype && allowedTypes.includes(file.mimetype)) {
       console.log('✅ Post file type accepted:', file.mimetype);
       cb(null, true);
     } else {
       console.error('❌ Post file type rejected:', file.mimetype);
-      cb(new Error(`Invalid file type: ${file.mimetype}. Only JPEG, PNG, GIF, and WebP are allowed.`));
+      const error = new Error(`Invalid file type: ${file.mimetype}. Only JPEG, PNG, GIF, and WebP images are allowed.`);
+      error.code = 'INVALID_FILE_TYPE';
+      cb(error, false);
     }
   },
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 1 // Max 1 file per post
+    files: 1, // Max 1 file per post
+    fieldSize: 10 * 1024 * 1024 // 10MB field size limit
+  },
+  onError: (err, next) => {
+    console.error('❌ Multer error in post upload:', err);
+    next(err);
   }
 });
 
@@ -56,7 +64,30 @@ if (typeof getNewPost === 'function') {
 }
 
 if (typeof createPost === 'function') {
-  router.post('/api/post/new', isAuthenticated, uploadPost.single('image'), createPost);
+  router.post('/api/post/new', isAuthenticated, (req, res, next) => {
+    uploadPost.single('image')(req, res, (err) => {
+      if (err) {
+        console.error('❌ Multer error in createPost:', err);
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'File size too large. Maximum size is 5MB.' 
+          });
+        } else if (err.code === 'INVALID_FILE_TYPE') {
+          return res.status(400).json({ 
+            success: false, 
+            error: err.message 
+          });
+        } else {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'File upload failed: ' + (err.message || 'Unknown error') 
+          });
+        }
+      }
+      next();
+    });
+  }, createPost);
 }
 
 if (typeof getEditPost === 'function') {
@@ -64,7 +95,30 @@ if (typeof getEditPost === 'function') {
 }
 
 if (typeof updatePost === 'function') {
-  router.put('/api/post/:id/edit', isAuthenticated, uploadPost.single('image'), updatePost);
+  router.put('/api/post/:id/edit', isAuthenticated, (req, res, next) => {
+    uploadPost.single('image')(req, res, (err) => {
+      if (err) {
+        console.error('❌ Multer error in updatePost:', err);
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'File size too large. Maximum size is 5MB.' 
+          });
+        } else if (err.code === 'INVALID_FILE_TYPE') {
+          return res.status(400).json({ 
+            success: false, 
+            error: err.message 
+          });
+        } else {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'File upload failed: ' + (err.message || 'Unknown error') 
+          });
+        }
+      }
+      next();
+    });
+  }, updatePost);
 }
 
 if (typeof deletePost === 'function') {

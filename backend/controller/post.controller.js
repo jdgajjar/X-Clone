@@ -97,8 +97,8 @@ const createPost = async (req, res) => {
     let { content } = req.body;
     let userId = req.user ? req.user._id : req.session.userId;
 
-    // Enhanced logging for Render.com troubleshooting
-    console.log('📝 CREATE POST REQUEST on Render.com:', {
+    // Enhanced logging for debugging
+    console.log('📝 CREATE POST REQUEST:', {
       body: req.body,
       file: req.file ? { 
         fieldname: req.file.fieldname,
@@ -112,19 +112,21 @@ const createPost = async (req, res) => {
       contentLength: content?.length || 0
     });
 
+    // Validate authentication
     if (!userId) {
-      return res.status(401).json({ success: false, error: "Not authenticated" });
+      return res.status(401).json({ success: false, error: "Authentication required" });
     }
 
+    // Validate content
     if (!content || content.trim() === '') {
-      return res.status(400).json({ success: false, error: "Content is required" });
+      return res.status(400).json({ success: false, error: "Post content is required" });
     }
 
-    // Handle image upload for Render.com deployment
+    // Handle image upload with improved error handling
     let image = undefined;
     if (req.file) {
       try {
-        console.log('🖼️ Processing post image on Render.com:', {
+        console.log('🖼️ Processing post image upload:', {
           fieldname: req.file.fieldname,
           filename: req.file.filename,
           originalname: req.file.originalname,
@@ -133,25 +135,31 @@ const createPost = async (req, res) => {
           path: req.file.path
         });
 
-        // Validate image file
+        // Validate image file before processing
         const { validateImageFile } = require('../cloudconflic');
-        validateImageFile(req.file);
+        const isValid = validateImageFile(req.file);
+        if (!isValid) {
+          throw new Error('Image validation failed');
+        }
 
-        // For Cloudinary uploads, the file.path contains the Cloudinary URL
-        let imageUrl = req.file.path;
-        let imageFilename = req.file.filename;
+        // Get image URL and filename from uploaded file
+        const imageUrl = req.file.path;
+        const imageFilename = req.file.filename;
         
-        // Check if it's a Cloudinary URL (already uploaded by multer-storage-cloudinary)
-        if (imageUrl.startsWith('http')) {
-          // File was uploaded to Cloudinary via multer-storage-cloudinary
+        // Check if multer-storage-cloudinary already uploaded to Cloudinary
+        if (imageUrl && imageUrl.startsWith('http') && imageFilename) {
+          // Direct Cloudinary URL from multer-storage-cloudinary
           image = {
             url: imageUrl,
             filename: imageFilename,
           };
-          console.log("✅ Post image uploaded to Cloudinary via multer-storage-cloudinary:", imageUrl);
-        } else {
-          // Fallback: manual Cloudinary upload for Render.com compatibility
-          console.log('☁️ Performing manual Cloudinary upload on Render.com...');
+          console.log("✅ Post image uploaded via multer-storage-cloudinary:", {
+            url: imageUrl,
+            filename: imageFilename
+          });
+        } else if (imageUrl && !imageUrl.startsWith('http')) {
+          // Manual upload needed (fallback for local file)
+          console.log('☁️ Performing manual Cloudinary upload...');
           
           const uploadOptions = {
             folder: "posts",
@@ -161,35 +169,10 @@ const createPost = async (req, res) => {
               { fetch_format: "auto" }
             ],
             resource_type: "auto",
-            timeout: 60000 // 60 second timeout for Render.com
+            timeout: 60000
           };
           
-          let result;
-          
-          // Try multiple upload approaches for Render.com reliability
-          try {
-            // Method 1: Direct file path upload
-            console.log('🔄 Attempting direct post image upload...');
-            result = await cloudinary.uploader.upload(imageUrl, uploadOptions);
-            console.log('✅ Direct post upload successful');
-          } catch (directError) {
-            console.log('⚠️ Direct post upload failed, trying buffer upload...', directError.message);
-            
-            // Method 2: Buffer upload (fallback for Render.com)
-            try {
-              const fileBuffer = require('fs').readFileSync(imageUrl);
-              // Detect MIME type from file
-              const mimeType = require('path').extname(imageUrl).toLowerCase() === '.png' ? 'image/png' : 'image/jpeg';
-              const base64Data = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
-              
-              console.log('🔄 Attempting post buffer upload...');
-              result = await cloudinary.uploader.upload(base64Data, uploadOptions);
-              console.log('✅ Post buffer upload successful');
-            } catch (bufferError) {
-              console.error('❌ Both post upload methods failed:', bufferError.message);
-              throw bufferError;
-            }
-          }
+          const result = await cloudinary.uploader.upload(imageUrl, uploadOptions);
           
           image = {
             url: result.secure_url,
@@ -204,13 +187,15 @@ const createPost = async (req, res) => {
             url: result.secure_url,
             public_id: result.public_id
           });
+        } else {
+          throw new Error('Invalid file upload: Missing file path or data');
         }
       } catch (imageError) {
-        console.error("❌ Post image upload error on Render.com:", imageError);
-        console.error("Error stack:", imageError.stack);
+        console.error("❌ Post image upload error:", imageError.message);
+        console.error("Full error:", imageError);
         return res.status(400).json({ 
           success: false, 
-          error: imageError.message || "Image upload failed on Render.com" 
+          error: `Image upload failed: ${imageError.message}` 
         });
       }
     }
@@ -301,72 +286,79 @@ const updatePost = async (req, res) => {
       return res.status(403).render("403", { error: "Forbidden" });
     }
 
-    // Handle image update or deletion
+    // Handle image deletion
     if (req.body.deleteImage === "1") {
-      // User requested to delete the image
-      if (
-        post.image &&
-        post.image.url &&
-        post.image.filename &&
-        post.image.url.startsWith("http")
-      ) {
+      console.log("🗑️ Deleting post image...");
+      
+      // Delete image from Cloudinary if it exists
+      if (post.image && post.image.filename && post.image.url && post.image.url.startsWith("http")) {
         try {
           await cloudinary.uploader.destroy(post.image.filename);
+          console.log("✅ Old post image deleted from Cloudinary:", post.image.filename);
         } catch (imgErr) {
-          console.error("Error deleting post image from Cloudinary:", imgErr);
+          console.log("⚠️ Error deleting post image from Cloudinary (non-critical):", imgErr.message);
         }
       }
+      
+      // Remove image from post
       post.image = undefined;
       post.content = content;
       
       try {
         await post.save();
+        console.log("✅ Post saved after image deletion");
+        
+        // Return JSON response for API calls
+        const updatedPost = await Post.findById(postId);
+        return res.status(200).json({ 
+          success: true, 
+          post: updatedPost, 
+          message: "Image deleted successfully" 
+        });
       } catch (saveError) {
-        console.error("Error saving post:", saveError);
-        return res.status(500).render("editepost", {
-          error:
-            saveError && saveError.stack
-              ? saveError.stack
-              : saveError && saveError.message
-              ? saveError.message
-              : "An error occurred while saving the post.",
-          user: req.user,
-          post: { _id: req.params.id, content: req.body.content },
+        console.error("❌ Error saving post after image deletion:", saveError);
+        return res.status(500).json({ 
+          success: false, 
+          error: "Failed to save post after deleting image" 
         });
       }
-
-      // Re-render the edit page with updated post (no redirect)
-      const updatedPost = await Post.findById(postId);
-      return res.json({ post: updatedPost, user: req.user });
-    } else if (req.file) {
-      // Handle new image upload for Render.com
+    } 
+    
+    // Handle new image upload
+    if (req.file) {
+      console.log("🖼️ Updating post image...");
+      
       try {
         // Validate image file
         const { validateImageFile } = require('../cloudconflic');
-        validateImageFile(req.file);
+        const isValid = validateImageFile(req.file);
+        if (!isValid) {
+          throw new Error('Image validation failed');
+        }
 
         // Delete old image from Cloudinary if it exists
         if (post.image && post.image.filename && post.image.url && post.image.url.startsWith("http")) {
           try {
             await cloudinary.uploader.destroy(post.image.filename);
-            console.log("Old post image deleted from Cloudinary:", post.image.filename);
+            console.log("✅ Old post image deleted from Cloudinary:", post.image.filename);
           } catch (imgErr) {
-            console.log("Error deleting old post image (non-critical):", imgErr.message);
+            console.log("⚠️ Error deleting old post image (non-critical):", imgErr.message);
           }
         }
 
-        // Handle Cloudinary upload for Render.com
-        let imageUrl = req.file.path;
-        let imageFilename = req.file.filename;
+        // Process new image upload
+        const imageUrl = req.file.path;
+        const imageFilename = req.file.filename;
         
-        if (imageUrl.startsWith('http')) {
-          // File was uploaded to Cloudinary via multer-storage-cloudinary
+        if (imageUrl && imageUrl.startsWith('http') && imageFilename) {
+          // Direct Cloudinary URL from multer-storage-cloudinary
           post.image = {
             url: imageUrl,
             filename: imageFilename,
           };
-        } else {
-          // Fallback: manual Cloudinary upload
+          console.log("✅ Post image updated via multer-storage-cloudinary:", post.image);
+        } else if (imageUrl && !imageUrl.startsWith('http')) {
+          // Manual Cloudinary upload needed
           const uploadOptions = {
             folder: "posts",
             transformation: [
@@ -374,7 +366,8 @@ const updatePost = async (req, res) => {
               { quality: "auto" },
               { fetch_format: "auto" }
             ],
-            resource_type: "auto"
+            resource_type: "auto",
+            timeout: 60000
           };
           
           const result = await cloudinary.uploader.upload(imageUrl, uploadOptions);
@@ -387,54 +380,48 @@ const updatePost = async (req, res) => {
           // Clean up temp file
           const { cleanupTempFile } = require('../cloudconflic');
           cleanupTempFile(imageUrl);
+          
+          console.log("✅ Post image updated via manual Cloudinary upload:", post.image);
+        } else {
+          throw new Error('Invalid file upload: Missing file path or data');
         }
         
-        console.log("Updated post image (Render.com):", post.image);
-        
       } catch (imageError) {
-        console.error("Post image update error:", imageError);
+        console.error("❌ Post image update error:", imageError.message);
+        console.error("Full error:", imageError);
         return res.status(400).json({ 
           success: false, 
-          error: imageError.message || "Image upload failed" 
+          error: `Image upload failed: ${imageError.message}` 
         });
       }
-    } else if (!post.image) {
-      // If no image uploaded and no image object, set image to undefined
-      post.image = undefined;
     }
 
+    // Update post content
     post.content = content;
     
     try {
       await post.save();
+      console.log("✅ Post updated successfully");
+      
+      // Return JSON response for API calls
+      return res.status(200).json({ 
+        success: true, 
+        post: post, 
+        message: "Post updated successfully" 
+      });
     } catch (saveError) {
-      console.error("Error saving post:", saveError);
-      return res.status(500).render("editepost", {
-        error:
-          saveError && saveError.stack
-            ? saveError.stack
-            : saveError && saveError.message
-            ? saveError.message
-            : "An error occurred while saving the post.",
-        user: req.user,
-        post: { _id: req.params.id, content: req.body.content },
+      console.error("❌ Error saving post:", saveError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to save post changes" 
       });
     }
-
-    // If this is an API request, respond with JSON
-    return res.json({ post, user: req.user });
   } catch (error) {
-    console.error("Error updating post:", error);
-    // Print full error stack for debugging
-    res.status(500).render("editepost", {
-      error:
-        error && error.stack
-          ? error.stack
-          : error && error.message
-          ? error.message
-          : "An error occurred while updating the post.",
-      user: req.user,
-      post: { _id: req.params.id, content: req.body.content },
+    console.error("❌ Error updating post:", error.message);
+    console.error("Full error:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: "An error occurred while updating the post" 
     });
   }
 };

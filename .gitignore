@@ -1,0 +1,9 @@
+# Root level dependencies
+/node_modules/
+/package-lock.json
+/package.json
+
+# Test files
+test_*.js
+test_*.png
+simple_*.js
