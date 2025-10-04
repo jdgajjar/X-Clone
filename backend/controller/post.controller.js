@@ -109,7 +109,8 @@ const createPost = async (req, res) => {
         size: req.file.size 
       } : 'No file uploaded',
       userId,
-      contentLength: content?.length || 0
+      contentLength: content?.length || 0,
+      contentType: req.headers['content-type']
     });
 
     // Validate authentication

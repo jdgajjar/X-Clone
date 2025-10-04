@@ -6,8 +6,8 @@ const getApiUrl = () => {
     // Production environment - use env or hardcoded backend URL
     return import.meta.env.VITE_API_URL || 'https://x-clone-1-d23n.onrender.com';
   } else {
-    // Development environment
-    return import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    // Development environment - use our sandbox backend URL
+    return import.meta.env.VITE_API_URL || 'https://3000-i8l8b86etqb6ib61qryxc-6532622b.e2b.dev';
   }
 };
 
@@ -24,20 +24,25 @@ if (import.meta.env.DEV) {
 
 const clientServer = axios.create({
   baseURL: BASE_URL,
-  withCredentials: false, // ✅ not needed unless using cookies
+  withCredentials: true, // ✅ Enable for session-based authentication
   timeout: 45000,
   headers: {
-    'Content-Type': 'application/json',
     'Accept': 'application/json'
+    // Don't set Content-Type here - let axios handle it based on data type
   }
 });
 
-// Request interceptor to add authentication header
+// Request interceptor to handle Content-Type (using session-based auth)
 clientServer.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token"); // ✅ consistent key
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // Set Content-Type based on data type
+  if (config.data instanceof FormData) {
+    // For FormData (file uploads), let the browser set Content-Type with boundary
+    delete config.headers['Content-Type'];
+  } else {
+    // For JSON data, explicitly set Content-Type
+    config.headers['Content-Type'] = 'application/json';
   }
+  
   return config;
 });
 
@@ -63,8 +68,7 @@ clientServer.interceptors.response.use(
     });
 
     if (error.response?.status === 401) {
-      // ✅ use same key as request interceptor
-      localStorage.removeItem('token');
+      // Session-based auth - redirect to login
       const currentPath = window.location.pathname;
       if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
         console.log('Redirecting to login due to 401 error');
